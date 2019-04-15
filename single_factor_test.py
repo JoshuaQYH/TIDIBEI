@@ -187,11 +187,20 @@ def on_data(context):
 
 
 if __name__ == '__main__':
-    factor_list = ["BIAS20"]
+
+    """
+    测试因子分类别进行，因子ID请看下列链接
+    https://www.digquant.com.cn/documents/23#h2-1-1-revs250--330
+    """
+
+    factor_list = ["BIAS20"]  # 将要测试的因子写入这个列表。
+
     file_path = 'single_factor_test.py'
     block = 'hs300'
+
     begin_date = '2016-01-01'
     end_date = '2016-06-30'
+
     for factor in factor_list:
         startegy_name = factor
         FactorCode = [factor]  # 修改全局变量

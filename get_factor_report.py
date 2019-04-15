@@ -1,5 +1,11 @@
 import atrader as at
 import pandas as pd
+"""
+运行之前！！！！！！！！！！！
+修改输出的csv文件名！！！！！！
+注意不要重复，可能会覆盖原来的文件！！！
+"""
+
 strategy_dicts = at.get_strategy_id()
 save_dict = {"测试因子": [],
                  '年化收益率': [],
