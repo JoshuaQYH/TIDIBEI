@@ -1,0 +1,25 @@
+import atrader as at
+import pandas as pd
+strategy_dicts = at.get_strategy_id()
+save_dict = {"测试因子": [],
+                 '年化收益率': [],
+                 '年化夏普率': [],
+                 '最大回撤率': [],
+                 'alpha': [],
+                 'beta': [],
+                 '信息比率': []
+                 }
+for strategy in strategy_dicts:
+    strategy_id = strategy["strategy_id"]
+    result = at.get_performance(strategy_id)
+    save_dict['测试因子'].append(result['strategy_name'])
+    save_dict['年化收益率'].append(result['annu_return'])
+    save_dict['年化夏普率'].append(result['sharpe_ratio'])
+    save_dict['最大回撤率'].append(result['max_drawback_rate'])
+    save_dict['alpha'].append(result['alpha'])
+    save_dict['beta'].append(result['beta'])
+    save_dict['信息比率'].append(result['info_ratio'])
+
+df = pd.DataFrame(save_dict)
+df.to_csv("single_factor_test.csv", sep=',')
+print(df)

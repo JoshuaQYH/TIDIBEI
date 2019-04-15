@@ -1,13 +1,17 @@
 """
 author: qiuyihao
 date: 2019/04/13 - 04-15
-description: 单因子测试
+description: 单因子测试 (此代码文件已失去意义，转用 atrader 进行因子绩效分析。）
 """
 import pandas as pd
 import numpy as np
 import atrader as at
 from sklearn import preprocessing
 from sklearn import linear_model
+import re
+import time
+import datetime
+
 
 # 中位数去极值法
 def filter_MAD(df, factor, n=5):
@@ -17,19 +21,47 @@ def filter_MAD(df, factor, n=5):
     :param n: 中位数偏差值的上下界倍数
     :return: 经过处理的因子dataframe
     """
-    print(df)
+    # print(df)
+
     median = df[factor].quantile(0.5)
     new_median = ((df[factor] - median).abs()).quantile(0.5)
     max_range = median + n * new_median
     min_range = median - n * new_median
 
     for i in range(df.shape[0]):
-        print(df.loc[i, factor])
         if df.loc[i, factor] > max_range:
             df.loc[i, factor] = max_range
         elif df.loc[i, factor] < min_range:
             df.loc[i, factor] = min_range
     return df
+
+
+# 判断某一个日期是否为周末，如果为周末，需要返回一个非周末的字符串。
+# 当时间是月末时，时间需要向前，当时间时月初是，时间需要向后
+# 采用递归实现,最终返回一个非周末的时间串
+# (其实这个函数的作用就是帮助减少几次获取因子而已，，，事后发现还不如直接靠get_factor_by_day判断
+def find_day_str(day_str):
+    """
+    :param day_str: 要求标准的时间串 如 2016-01-01
+    :return: 返回一个合适的时间串
+    """
+    year = int(day_str[0:4])
+    month = int(day_str[5:7])
+    day = int(day_str[8:10])
+    any_day = datetime.datetime(year, month, day).strftime("%w")
+    result_str = day_str
+    if any_day == '6' or any_day == '0':
+        if day < 15:
+            day += 1
+            if day < 10:
+                day = '0' + str(day)
+            else:
+                day = str(day)
+        elif day > 15:
+            day -= 1
+            day = str(day)
+        result_str = find_day_str(day_str[0:8] + day)
+    return result_str
 
 
 # 生成起始日期对
@@ -39,6 +71,7 @@ def create_date(begin_date, end_date):
     :param end_date: 结束日期 指明结束年月    如 '2018-10'
     :return: 一个起始年月日列表,一个结束年月日列表
      以一个月的第一天和最后一天作为一对日期 如 ['2018-01-01',..] ['2018-01-31',..]
+     注：需要排斥这两天为周末或者法定假期的时候
     """
     # 解析字符串
     begin_year = int(begin_date[0:4])
@@ -57,25 +90,45 @@ def create_date(begin_date, end_date):
     small_month = [4, 6, 9, 11]   # 二月另外判断
     while year <= end_year and month <= end_month:
         date_pair = []
+
+        start = ''
+        end = ''
+
         if month >= 10:
             start = str(year) + '-' + str(month) + '-' + '01'
+            end = str(year) + '-' + str(month) + '-'
         else:
             start = str(year) + '-0' + str(month) + '-' + '01'
-        begin_date_list.append(start)
-        end = ''
+            end = str(year) + '-0' + str(month) + '-'
+
+        # 避免出现节假日或者周末,若出现则往后推一天
+        while at.get_factor_by_day(factor_list=["PE"], target_list=["SZSE.000001"], date=start) is None:
+            start_day = int(start[8:10]) + 1
+            if start_day < 10:
+                start = start[0:8] + '0' + str(start_day)
+            else:
+                start = start[0:8] + str(start_day)
+
+        begin_date_list.append(start)  # 插入一个非周末非法定假期的开始时间串
+
         # 判断月为大，为小
         if month in big_month:
-            end = str(year) + '-' + str(month) + '-' + '31'
+            end = end + '31'
         elif month in small_month:
-            end = str(year) + '-' + str(month) + '-' + '30'
+            end = end + '30'
         elif month == 2:
             if year % 4 == 0 and year % 100 != 0 or year % 400 == 0:
-                end = str(year) + '-' + str(month) + '-' + '29'
+                end = end + '29'
             else:
-                end = str(year) + '-' + str(month) + '-' + '28'
+                end = end + '28'
+
+        while at.get_factor_by_day(factor_list=["PE"], target_list=["SZSE.000001"], date=end) is None:
+            end_day = int(end[8:10]) - 1
+            end = end[0:8] + str(end_day)
+
+        end_date_list.append(end)  # 插入一个非周末，非法定假期的结束时间串
 
         month += 1
-        end_date_list.append(end)
         if month == 13:
             year += 1
             month = 1
@@ -84,7 +137,6 @@ def create_date(begin_date, end_date):
 
 # 计算每一个月的单个股票平均收益率
 def cal_yield_rate(code, begin_date, end_date):
-
     """
     :param code: 股票代码
     :param begin_date: K线起始日期，月初
@@ -93,16 +145,19 @@ def cal_yield_rate(code, begin_date, end_date):
     """
     day_data = at.get_kdata(target_list=[code], frequency='day', fre_num=1, begin_date=begin_date,
                             end_date=end_date, fill_up=False, df=True, fq=1, sort_by_date=True)
-
-    yield_rate = (day_data['close'][len(day_data) - 1] - day_data['close'][0])/day_data['close'][0]
+    yield_rate = 0.0
+    try:
+        yield_rate = (day_data['close'][len(day_data) - 1] - day_data['close'][0])/day_data['close'][0]
+    except Exception:
+        yield_rate = -1
     return yield_rate
 
 
 # 单因子测试函数
-def test_factor(factor, code_list, begin_date_list, end_date_list):
+def test_factor(factor, block, begin_date_list, end_date_list):
     """
     :param factor:  待测的单因子
-    :param code_list : 成分股和权重 如 hs300 code_list = at.get_code_list(block, date=begin_date_list[i])
+    :param block : 股市指数
     :param begin_date_list: 获取每一期因子的开始时间 （12个月，每月一次，从月初开始和月末结束）
     :param end_date_list: 获取每一期因子的结束时间
     :return: 因子的年夏普率，股票总体收益率序列 。。。
@@ -120,42 +175,62 @@ def test_factor(factor, code_list, begin_date_list, end_date_list):
     # 遍历每一期
     for i in range(len(begin_date_list)):
 
+        print("{} - {}: 获取K线数据！".format(begin_date_list[i], end_date_list[i]))
+        code_list = at.get_code_list(block, date=begin_date_list[i])
         target_list = code_list['code'].tolist()  # 本月股票池代码
         weight_list = np.array(code_list['weight'].tolist())  # 本月各股票权重
-        weight_list = weight_list / weight_list.sum()  # 权重归一化
-        weight_list = weight_list.reshape(1, -1)
 
         # 获取因子月初数据
-        print(factor, target_list, begin_date_list[i])
-        factor_data = at.get_factor_by_day(factor_list=factor, target_list=target_list,
+        print("{} - {}: 获取因子数据！".format(begin_date_list[i], end_date_list[i]))
+        factor_data = at.get_factor_by_day(factor_list=[factor], target_list=target_list,
                                            date=begin_date_list[i])
 
         # 平均值填充缺失值 中位数去极值 & z-score 规范化
-        factor_data = factor_data.fillna(factor_data.mean())
+        factor_data = factor_data.fillna(factor_data[factor].mean())
         factor_data = filter_MAD(factor_data, factor, n=5)
         factor_data[factor] = preprocessing.scale(factor_data[factor])
-        print(factor_data)
+
         # 提取因子列，变为np array
-        factor_data = np.array(factor_data[factor].tolist()).reshape(1, -1)
+        factor_data = np.array(factor_data[factor].tolist())
 
         yield_rate = []  # 股票池个股本月平均收益率
-        for target in target_list:
-            yield_rate.append(cal_yield_rate(target, begin_date_list[i], end_date_list[i]))
+        tmp_target_list = target_list
+        for j, target in enumerate(target_list):
+            rate = cal_yield_rate(target, begin_date_list[i], end_date_list[i])
+            if rate != -1:
+                yield_rate.append(cal_yield_rate(target, begin_date_list[i], end_date_list[i]))
+            else:  # 从股票池中删除，权重列表中删除，因子列表中删除
+                tmp_target_list = np.delete(tmp_target_list, [j])
+                weight_list = np.delete(weight_list, [j])
+                factor_data = np.delete(factor_data, [j])
+
+        weight_list = weight_list / weight_list.sum()  # 权重归一化
+        weight_list = weight_list.reshape(1, -1)
+        factor_data = factor_data.reshape(1, -1)
         yield_rate = np.array(yield_rate).reshape(1, -1)
 
+        print("{} - {}: 开始拟合！".format(begin_date_list[i], end_date_list[i]))
         LR = linear_model.LinearRegression()
         LR.fit(factor_data, yield_rate)  # 拟合月初因子和本月平均收益率
-        factor_return_list.append(LR.coef_)  # 记录因子收益率
 
+        coef_list = list(LR.coef_)[0]
+        coef_list = [round(coef, 2) for coef in coef_list]
+        factor_return_list.append(coef_list)  # 记录因子收益率 保留小数点两位
+
+        print("{} - {}: 开始预测！".format(begin_date_list[i], end_date_list[i]))
         pred_yield_rate = LR.predict(factor_data)  # 预测的各股票收益率
 
-        single_yield_rate_list.append(list(pred_yield_rate))  # 记录当月各股票收益率
+        rate_list = list(pred_yield_rate)[0]
+        rate_list = [round(r, 2) for r in rate_list]
+        single_yield_rate_list.append(rate_list)  # 记录当月各股票收益率 小数点两位
 
         # 利用权重和个股收益计算股票池整体平均收益率
         mean_yield_rate = (pred_yield_rate * weight_list).sum()
 
         # 记录当月股票整体平均收益率
-        yield_rate_list.append(list(mean_yield_rate))
+        yield_rate_list.append(round(float(mean_yield_rate), 2))  # 小数点两位
+
+        print("{} - {}: 股票平均收益率拟合完毕！".format(begin_date_list[i], end_date_list[i]))
 
     # 计算超额收益率
     yield_rate_array = np.array(yield_rate_list)
@@ -170,16 +245,42 @@ def test_factor(factor, code_list, begin_date_list, end_date_list):
     return sharp_ratio, yield_rate_list
 
 
-factor = ["PE"]
-begin_date_list, end_date_list = create_date('2016-01', '2016-12')
-A = at.get_code_list('hs300', date='2016-01-01')
-sharp_ratio, yield_rate_list = test_factor(factor, A, begin_date_list, end_date_list)
-print(sharp_ratio)
-print(yield_rate_list)
+def find_factor(factor, block, begin_date_list, end_date_list):
+    """
+    :param factor: 因子名
+    :param begin_date_list: 开始年月日列表
+    :param block: 股票指数
+    :param end_date_list:  结束年月列表
+    :return: 年化夏普率，收益率均值，方差，
+    """
+    sharp_ratio, yield_rate_list = test_factor(factor, block, begin_date_list, end_date_list)
+    yield_rate = np.array(yield_rate_list)
+    return sharp_ratio, np.mean(yield_rate), np.var(yield_rate)
+
+
+def test_all_factors(factor_list, block, begin_date, end_date):
+    """
+    :param factor_list: 因子列表
+    :param block: 股市指数
+    :param begin_date: 开始年月
+    :param end_date: 结束年月
+    :return: 年化夏普率列表, 各因子对应的的股票收益率方差，均值
+    """
+    begin_date_list, end_date_list = create_date(begin_date, end_date)
+    sharp_ratio_list = []
+    return_var = []
+    return_mean = []
+    for factor in factor_list:
+        sharp_ratio, mean, var = find_factor(factor, block, begin_date_list, end_date_list)
+        sharp_ratio_list.append(sharp_ratio)
+        return_var.append(var)
+        return_mean.append(mean)
+    return sharp_ratio_list, return_mean, return_var
 
 # 分层回测 todo
 # IC，波动率 todo
 # 共线性分析 todo
+# 可视化 todo
 
 
 
