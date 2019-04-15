@@ -2,15 +2,15 @@
 -------------------------------------------------------
 策略思路：
 1. 回测标的：沪深300成分股
-2. 回测时间段：2016-01-01 至 2016-12-31
+2. 回测时间段：2016-01-01 至 2018-09-30
 3. 特征选择：待测单因子
 4. 单因子回归测试模型思路：
-    1. 先获得 50 天以上的 K线数据和因子数据；因子数据必须进行！预处理！
-    2. 以25 天为一次训练单位，其中前 20 天的因子作为训练样本特征，
+    1. 先获得 100 天以上的 K线数据和因子数据；因子数据必须进行！预处理！
+    2. 以 50 天为一次训练单位，其中前 30 天的因子作为训练样本特征，
     3. 使用单变量线性模型进行训练。
-    4. 回到当前时间点，使用前 20 天的因子数据作为预测样本特征，预测后 5 天的各股票平均收益率的大小。
+    4. 回到当前时间点，使用前 30 天的因子数据作为预测样本特征，预测后 10 天的各股票平均收益率的大小。
 5. 选股逻辑：
-    将符合预测结果的股票按均等分配可用资金进行下单交易。持有 5 天之后，再次进行训练预测。
+    将符合预测结果的股票按均等分配可用资金进行下单交易。持有 一个月后 ，再次进行调仓，训练预测。
 6. 交易逻辑：
     每次调仓时，若当前有持仓，并且符合选股条件，则仓位不动；
                               若不符合选股条件，则所有仓位平仓；
@@ -31,6 +31,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 import math
 from sklearn import preprocessing
+import datetime
 
 # 作为全局变量进行测试
 FactorCode = ["PB"]
@@ -68,19 +69,24 @@ def init(context):
     context.FactorCode = FactorCode
 
     # 超参数设置：
-    context.Len = 50  # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日
-    # 我们的目的就是使用前20天的因子数据作为样本，未来5天的股票收益率作为标签，进行回归。
+    context.Len = 100  # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日
+    # 我们的目的就是使用前30天的因子数据作为样本，未来10天的股票收益率作为标签，进行回归。
     # 在前50天，可以取多组样本和标签，构成回归测试的数据
-    context.N1 = 20   # 训练样本的时间跨度，代表训练的天数  // 样本过高过低都不太好，过高可能有噪声，过低数据特征不明显
-    context.N2 = 5   # 标签的时间跨度,代表预测未来的天数  // 换手率相应会增加,运行时间也增加。
+    context.N1 = 30   # 训练样本的时间跨度，代表训练的天数  // 样本过高过低都不太好，过高可能有噪声，过低数据特征不明显
+    context.N2 = 30   # 标签的时间跨度,代表预测未来的天数  // 换手率相应会增加,运行时间也增加。
     context.Num = 0   # 记录当前交易日个数
 
+    # 确保月初调仓
+    days = get_trading_days('SSE', '2016-01-01', '2018-09-30')
+    months = np.vectorize(lambda x: x.month)(days)
+    month_begin = days[pd.Series(months) != pd.Series(months).shift(1)]
+    context.month_begin = pd.Series(month_begin).dt.strftime('%Y-%m-%d').tolist()
 
 def on_data(context):
     context.Num = context.Num + 1
     if context.Num < context.Len:  # 如果交易日个数小于Len+1，则进入下一个交易日进行回测
         return
-    if bool(context.Num % context.N2):  # 每隔 N2 天进行调仓
+    if datetime.datetime.strftime(context.now, '%Y-%m-%d') not in context.month_begin:  # 调仓频率为月,月初开始调仓
         return
 
     # 获取数据：
@@ -150,7 +156,6 @@ def on_data(context):
     FactorDataTest = FactorDataTest.dropna(axis=0, how='any').reset_index(drop=True)  # 清洗数据
     Idx = FactorDataTest['idx']  # 剩余标的序号
 
-    # logistic回归模型：
     # 预测特征构建：
     X = np.ones([FactorData.shape[0], len(Fcode)])
     Xtest = np.ones([FactorDataTest.shape[0], len(Fcode)])
@@ -193,13 +198,13 @@ if __name__ == '__main__':
     https://www.digquant.com.cn/documents/23#h2-1-1-revs250--330
     """
 
-    factor_list = ["BIAS20"]  # 将要测试的因子写入这个列表。
+    factor_list = ["MktValue"]  # 将要测试的因子写入这个列表。
 
     file_path = 'single_factor_test.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
-    end_date = '2016-06-30'
+    end_date = '2018-09-30'
 
     for factor in factor_list:
         startegy_name = factor
