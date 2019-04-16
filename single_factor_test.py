@@ -63,7 +63,8 @@ def filter_MAD(df, factor, n=3):
 
 def init(context):
     # 账号设置：设置初始资金为 10000000 元
-    set_backtest(initial_cash=10000000)
+    set_backtest(initial_cash=1000000, future_cost_fee=1.0, stock_cost_fee=30, margin_rate=1.0, slide_price=0.0,
+                 price_loc=1, deal_type=0, limit_type=0)
     # 注册数据：日频数据
     reg_kdata('day', 1)
     global FactorCode  # 全局单因子代号
@@ -72,12 +73,15 @@ def init(context):
     context.FactorCode = FactorCode  #
 
     # 超参数设置：
-    context.Len = 60  # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日
+    context.Len = 50  # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日
     # 我们的目的就是使用前30天的因子数据作为样本，未来10天的股票收益率作为标签，进行回归。
     # 在前50天，可以取多组样本和标签，构成回归测试的数据
-    context.N1 = 1    # 训练样本的时间跨度，代表训练的天数  // 样本过高过低都不太好，过高可能有噪声，过低数据特征不明显
-    context.N2 = 30   # 标签的时间跨度,代表预测未来的天数  // 换手率相应会增加,运行时间也增加。
+    context.N1 = 1    # 训练样本的时间跨度，代表训练的天数  // 过高过低都不太好，过高可能有噪声，过低数据特征不明显
+    context.N2 = 30   # 标签的时间跨度,代表预测未来的天数  //
     context.Num = 0   # 记录当前交易日个数
+
+    context.upper_pos = 75  # 股票预测收益率的上分位数，高于则买入
+    context.down_pos = 25   # 股票预测收益率的下分位数，低于则卖出
 
     # 确保月初调仓
     days = get_trading_days('SSE', '2016-01-01', '2018-09-30')
@@ -135,8 +139,9 @@ def on_data(context):
         # 按标签处理数据：
         close = np.array(KData[KData['target_idx'] == tempIdx[i]]['close'])
         # 将N2内的天收益率作为标签
-        signValue = np.sign((close[context.N1 + context.N2:] - close[context.N1:context.Len - context.N2]) / close[
-                                                                                                             context.N1:context.Len - context.N2])  # 标签构建
+        signValue = np.sign((close[context.N1 + context.N2:] -
+                             close[context.N1:context.Len - context.N2]) / close[context.N1:context.Len - context.N2])
+
         FactorData0['signClose'] = signValue
         # idx:
         FactorData0['idx'] = tempIdx[i]
@@ -167,11 +172,11 @@ def on_data(context):
 
     Y = np.array(FactorData['signClose']).astype(int)
 
-    # 构建模型：
+    # 构建模型： 这一步放在了 init里头，模型成为全局变量
     LRModel = LinearRegression()
 
     # 模型训练：
-    LRModel = LRModel.fit(X, Y)
+    LRModel.fit(X, Y)
 
     # LR分类预测：
     y = LRModel.predict(Xtest)
@@ -180,22 +185,29 @@ def on_data(context):
     positions = context.account().positions['volume_long']  # 多头持仓数量
     valid_cash = context.account(account_idx=0).cash['valid_cash'][0]  # 可用资金
 
-    print(sum(y > 0))
-    P = 0.75 / (sum(y > 0) + 1)  # 设置每只标的可用资金比例 + 1 防止分母为0
+    P = 0.6 / (sum(y > 0) + 1)  # 设置每只标的可用资金比例 + 1 防止分母为0
 
     # 获取收益率的高四分位数和低四分位数
-    high_return, low_return = np.percentile(y, [25, 75])
+    high_return, low_return = np.percentile(y, [30, 70])
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
-        if position == 0 and y[i] > high_return:  # 当前无仓，且该股票收益大于高四分位数，则开仓，买入
+        if position == 0 and y[i] > high_return and valid_cash > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
             # 开仓数量 + 100防止开仓数量为0  + 1防止分母为0
+            print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
             Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100) + 100
-            #print("开仓数量为：{}".format(Num))
+
+            # 控制委托量区间
+            if Num < 1000:
+                Num *= 10
+            if Num > 100000:
+                Num = int(Num / 10)
+
+            print("开仓数量为：{}".format(Num))
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,
                          price=0)  # 指定委托量开仓
 
-        elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低四分位数，则平仓，卖出
+        elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
             #print("平仓")
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position), side=2, position_effect=2,
                          order_type=2, price=0)  # 指定委托量平仓
