@@ -344,6 +344,7 @@ result = test_all_factors(["NLSIZE", "MktValue", "BIAS10", "NegMktValue", "Curre
                            "MLEV", "Variance20", "ROAEBIT"],
                           'hs300', '2016-01', '2018-09',
                           layer_sign=0)  # 0 不分层  1 低流通市值  2 中流通市值  3 高流通市值
+
 result.to_csv("single_factor_test.csv", sep=',')
 
 

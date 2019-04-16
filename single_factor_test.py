@@ -5,16 +5,16 @@
 2. 回测时间段：2016-01-01 至 2018-09-30
 3. 特征选择：待测单因子
 4. 单因子回归测试模型思路：
-    1. 先获得 30 天以上的K线数据和因子数据；因子数据必须进行！预处理！
-    2. 以 50 天为一次训练单位，其中前 30 天的因子作为训练样本特征，
-    3. 使用单变量线性模型进行训练。
+    1. 先获得 30 天以上的K线数据和因子数据，预处理
+    2. 使用月末因子和本月收益率进行线性回归
+    3. 使用单变量线性模型进行训练
     4. 回到当前时间点，使用前 1 天的因子数据作为预测样本特征，预测后 30 天的各股票平均收益率的大小。
 5. 选股逻辑：
     将符合预测结果的股票按均等分配可用资金进行下单交易。持有 一个月后 ，再次进行调仓，训练预测。
 6. 交易逻辑：
     每次调仓时，若当前有持仓，并且符合选股条件，则仓位不动；
-                              若不符合选股条件，则所有仓位平仓；
-                若当前无仓，并且符合选股条件，则多开仓；
+                              若不符合选股条件，则对收益最低的25%标的进行仓位平仓；
+                若当前无仓，并且符合选股条件，则多开仓，对收益最高的25%标的进行开仓；
                             若不符合选股条件，则不开仓，无需操作。
 
 ---------------------------------------------------------
@@ -32,9 +32,12 @@ from sklearn.linear_model import LinearRegression
 import math
 from sklearn import preprocessing
 import datetime
+import sys
 
 # 作为全局变量进行测试
-FactorCode = ["PB"]
+factor = sys.argv[1]
+FactorCode = [factor]
+print("传入因子参数为" + factor)
 
 
 # 中位数去极值法
@@ -59,14 +62,14 @@ def filter_MAD(df, factor, n=3):
 
 
 def init(context):
-    # 账号设置：设置初始资金为 1000000 元
-    set_backtest(initial_cash=1000000)
+    # 账号设置：设置初始资金为 10000000 元
+    set_backtest(initial_cash=10000000)
     # 注册数据：日频数据
     reg_kdata('day', 1)
     global FactorCode  # 全局单因子代号
     reg_factor(factor=FactorCode)
-
-    context.FactorCode = FactorCode
+    print("init 函数, 注册因子为{}".format(FactorCode[0]))
+    context.FactorCode = FactorCode  #
 
     # 超参数设置：
     context.Len = 60  # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日
@@ -81,6 +84,7 @@ def init(context):
     months = np.vectorize(lambda x: x.month)(days)
     month_begin = days[pd.Series(months) != pd.Series(months).shift(1)]
     context.month_begin = pd.Series(month_begin).dt.strftime('%Y-%m-%d').tolist()
+
 
 def on_data(context):
     context.Num = context.Num + 1
@@ -118,11 +122,9 @@ def on_data(context):
         # 序号对齐
         FData0 = FData[FData['target_idx'] == tempIdx[i]].reset_index(drop=True)
 
-        global FactorCode  # 全局单因子代号
-
-        FData0.dropna(axis=0)  # 删除因子缺失的股票
+        # FData0.dropna(axis=0)  # 删除因子缺失的股票
         FData0 = filter_MAD(FData0, "value", 3)  # 中位数去极值法
-        #FData0["value"] = preprocessing.scale(FData0["value"])  # 标准化
+        # FData0["value"] = preprocessing.scale(FData0["value"])  # 标准化
 
         # 按特征处理数据：
         for FC in context.FactorCode:
@@ -178,7 +180,8 @@ def on_data(context):
     positions = context.account().positions['volume_long']  # 多头持仓数量
     valid_cash = context.account(account_idx=0).cash['valid_cash'][0]  # 可用资金
 
-    P = 0.75 / sum(y > 0)  # 设置每只标的可用资金比例
+    print(sum(y > 0))
+    P = 0.75 / (sum(y > 0) + 1)  # 设置每只标的可用资金比例 + 1 防止分母为0
 
     # 获取收益率的高四分位数和低四分位数
     high_return, low_return = np.percentile(y, [25, 75])
@@ -186,7 +189,8 @@ def on_data(context):
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
         if position == 0 and y[i] > high_return:  # 当前无仓，且该股票收益大于高四分位数，则开仓，买入
-            Num = int(math.floor(valid_cash * P / 100 / KData['close'][Idx[i]]) * 100) + 100  # 开仓数量 + 100防止开仓数量为0
+            # 开仓数量 + 100防止开仓数量为0  + 1防止分母为0
+            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100) + 100
             #print("开仓数量为：{}".format(Num))
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,
                          price=0)  # 指定委托量开仓
@@ -199,58 +203,15 @@ def on_data(context):
 
 if __name__ == '__main__':
 
-    """
-    测试因子分类别进行，因子ID请看下列链接
-    https://www.digquant.com.cn/documents/23#h2-1-1-revs250--330
-    """
-
-    factor_list = ["REVS250"]  # 将要测试的因子写入这个列表。
-
     file_path = 'single_factor_test.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
-    end_date = '2016-09-30'
+    end_date = '2018-09-30'
 
-    for factor in factor_list:
-        startegy_name = factor
-        FactorCode = [factor]  # 修改全局变量，改变测试的因子
-        print(FactorCode)
-        try:
-            run_backtest(strategy_name=startegy_name, file_path=file_path,
-                        target_list=list(get_code_list('hs300', date=begin_date)['code']),
-                        frequency='day', fre_num=1, begin_date=begin_date, end_date=end_date, fq=1)
-        except Exception:
-            print("该因子回测报告出错,跳过。请检查AT是否打开！")
-            pass
+    strategy_name = factor
 
-    """
-    ... 此时可能出现报告还未计算结束的情况，得重开另外一个文件获取字段。
-    
-    atSendCmdGetBackTestPerformance, Code: 2, Reason: strategy backtest is still running
-    
-    strategy_dicts = get_strategy_id()
-
-    save_dict = {"测试因子": [],
-                 '年化收益率': [],
-                 '年化夏普率': [],
-                 '最大回撤率': [],
-                 'alpha': [],
-                 'beta': [],
-                 '信息比率': []
-                 }
-    for strategy in strategy_dicts:
-        strategy_id = strategy["strategy_id"]
-        result = get_performance(strategy_id)
-        save_dict['测试因子'].append(result['strategy_name'])
-        save_dict['年化收益率'].append(result['annu_return'])
-        save_dict['年化夏普率'].append(result['sharpe_ratio'])
-        save_dict['最大回撤率'].append(result['max_drawback_rate'])
-        save_dict['alpha'].append(result['alpha'])
-        save_dict['beta'].append(result['beta'])
-        save_dict['信息比率'].append(result['info_ratio'])
-
-    df = pd.DataFrame[save_dict]
-    df.to_csv("single_factor_test.csv", sep=',')
-    """
+    run_backtest(strategy_name=strategy_name, file_path=file_path,
+                 target_list=list(get_code_list('hs300', date=begin_date)['code']),
+                 frequency='day', fre_num=1, begin_date=begin_date, end_date=end_date, fq=1)
 
