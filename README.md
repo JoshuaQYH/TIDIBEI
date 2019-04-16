@@ -22,8 +22,11 @@
 - 回测结果记录，分析。
 
 > _**官方提示：**_ random forest, SVM, Adaboost, etc.
-> 可参考论文[GBDT提取特征 + SVM二分类的方法](https://github.com/JoshuaQYH/TIDIBEI/blob/master/references/SA20190100000_36930159.pdf)
-
+> 
+#### 关于模型的一些设想
+- 可参考论文[GBDT提取特征 + SVM二分类的方法](https://github.com/JoshuaQYH/TIDIBEI/blob/master/references/SA20190100000_36930159.pdf)
+- [LSTM进行选股](https://qiniu-images.datayes.com/huatai9.pdf)（在月频数据较少，可能效果不好）
+- [Adaboost](http://pg.jrj.com.cn/acc/Res/CN_RES/INVEST/2016/5/31/ed36ae43-0f6e-4051-bb9c-2e9a67632d74.pdf), randomforest, svm，logisitc等等进行集成。如[Stacking](https://cloud.tencent.com/developer/article/1137060) 
 
 ### 风险控制
 - 风险模型
