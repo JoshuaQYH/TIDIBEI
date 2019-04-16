@@ -38,3 +38,5 @@
 - [头寸解释](https://wiki.mbalib.com/wiki/%E5%A4%B4%E5%AF%B8)
 - [阮一峰常用git命令清单](http://www.ruanyifeng.com/blog/2015/12/git-cheat-sheet.html)
 - [点宽因子数据字典](https://www.digquant.com.cn/documents/23)
+- [名词解释：IC/IR](https://xueqiu.com/1652627245/108835836)
+- [名词解释：alpha值/beta值](https://blog.csdn.net/yezi113yezi/article/details/81078128)
