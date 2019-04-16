@@ -22,9 +22,12 @@
 - 回测结果记录，分析。
 
 > _**官方提示：**_ random forest, SVM, Adaboost, etc.
+> 可参考论文[GBDT提取特征 + SVM二分类的方法](https://github.com/JoshuaQYH/TIDIBEI/blob/master/references/SA20190100000_36930159.pdf)
+
 
 ### 风险控制
-...
+- 风险模型
+- 择时模型
 
 
 ## 文件说明
@@ -33,8 +36,6 @@
 - `single_factor_test.py`: 单因子测试文件。
 - `find_factor.py`: 自实现的因子绩效分析文件(**已弃用**)
 - `run_test.bat`: 脚本自动化运行python程序，实现多次执行策略。
-
-
 
 
 ## LINK 
