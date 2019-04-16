@@ -45,3 +45,4 @@
 - [名词解释：IC/IR](https://xueqiu.com/1652627245/108835836)
 - [名词解释：alpha值/beta值](https://blog.csdn.net/yezi113yezi/article/details/81078128)
 - [A题华师现场解读](https://edu.tipdm.org/)
+- [人工智能阿尔法策略框架-对282个因子的分析](https://www.jiqizhixin.com/articles/2019-01-26-5)
