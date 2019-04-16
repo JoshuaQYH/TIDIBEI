@@ -27,5 +27,5 @@ for strategy in strategy_dicts:
     save_dict['信息比率'].append(result['info_ratio'])
 
 df = pd.DataFrame(save_dict)
-df.to_csv("single_factor_test.csv", sep=',')
+df.to_csv("strategy.csv", sep=',')
 print(df)

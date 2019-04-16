@@ -5,10 +5,10 @@
 2. 回测时间段：2016-01-01 至 2018-09-30
 3. 特征选择：待测单因子
 4. 单因子回归测试模型思路：
-    1. 先获得 100 天以上的 K线数据和因子数据；因子数据必须进行！预处理！
+    1. 先获得 30 天以上的K线数据和因子数据；因子数据必须进行！预处理！
     2. 以 50 天为一次训练单位，其中前 30 天的因子作为训练样本特征，
     3. 使用单变量线性模型进行训练。
-    4. 回到当前时间点，使用前 30 天的因子数据作为预测样本特征，预测后 10 天的各股票平均收益率的大小。
+    4. 回到当前时间点，使用前 1 天的因子数据作为预测样本特征，预测后 30 天的各股票平均收益率的大小。
 5. 选股逻辑：
     将符合预测结果的股票按均等分配可用资金进行下单交易。持有 一个月后 ，再次进行调仓，训练预测。
 6. 交易逻辑：
@@ -17,7 +17,7 @@
                 若当前无仓，并且符合选股条件，则多开仓；
                             若不符合选股条件，则不开仓，无需操作。
 
-----------
+---------------------------------------------------------
 运行方法：
 1. 在 main 中定义同一类的因子列表。
 2. 逐个因子执行回测。
@@ -69,10 +69,10 @@ def init(context):
     context.FactorCode = FactorCode
 
     # 超参数设置：
-    context.Len = 100  # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日
+    context.Len = 60  # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日
     # 我们的目的就是使用前30天的因子数据作为样本，未来10天的股票收益率作为标签，进行回归。
     # 在前50天，可以取多组样本和标签，构成回归测试的数据
-    context.N1 = 30   # 训练样本的时间跨度，代表训练的天数  // 样本过高过低都不太好，过高可能有噪声，过低数据特征不明显
+    context.N1 = 1    # 训练样本的时间跨度，代表训练的天数  // 样本过高过低都不太好，过高可能有噪声，过低数据特征不明显
     context.N2 = 30   # 标签的时间跨度,代表预测未来的天数  // 换手率相应会增加,运行时间也增加。
     context.Num = 0   # 记录当前交易日个数
 
@@ -122,7 +122,7 @@ def on_data(context):
 
         FData0.dropna(axis=0)  # 删除因子缺失的股票
         FData0 = filter_MAD(FData0, "value", 3)  # 中位数去极值法
-        FData0["value"] = preprocessing.scale(FData0["value"])  # 标准化
+        #FData0["value"] = preprocessing.scale(FData0["value"])  # 标准化
 
         # 按特征处理数据：
         for FC in context.FactorCode:
@@ -167,10 +167,10 @@ def on_data(context):
 
     # 构建模型：
     LRModel = LinearRegression()
-    print(X)
-    print(Y)
+
     # 模型训练：
     LRModel = LRModel.fit(X, Y)
+
     # LR分类预测：
     y = LRModel.predict(Xtest)
 
@@ -178,15 +178,21 @@ def on_data(context):
     positions = context.account().positions['volume_long']  # 多头持仓数量
     valid_cash = context.account(account_idx=0).cash['valid_cash'][0]  # 可用资金
 
-    P = 0.6 / sum(y > 0)  # 设置每只标的可用资金比例
+    P = 0.75 / sum(y > 0)  # 设置每只标的可用资金比例
+
+    # 获取收益率的高四分位数和低四分位数
+    high_return, low_return = np.percentile(y, [25, 75])
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
-        if position == 0 and y[i] > 0:  # 当前无仓，且该股票收益大于0，则开仓，买入
-            Num = int(math.floor(valid_cash * P / 100 / KData['close'][Idx[i]]) * 100)  # 开仓数量
+        if position == 0 and y[i] > high_return:  # 当前无仓，且该股票收益大于高四分位数，则开仓，买入
+            Num = int(math.floor(valid_cash * P / 100 / KData['close'][Idx[i]]) * 100) + 100  # 开仓数量 + 100防止开仓数量为0
+            #print("开仓数量为：{}".format(Num))
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,
                          price=0)  # 指定委托量开仓
-        elif position > 0 and y[i] < 0: # 当前持仓，且该股票收益小于0，则平仓，卖出
+
+        elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低四分位数，则平仓，卖出
+            #print("平仓")
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position), side=2, position_effect=2,
                          order_type=2, price=0)  # 指定委托量平仓
 
@@ -198,24 +204,24 @@ if __name__ == '__main__':
     https://www.digquant.com.cn/documents/23#h2-1-1-revs250--330
     """
 
-    factor_list = ["MktValue"]  # 将要测试的因子写入这个列表。
+    factor_list = ["REVS250"]  # 将要测试的因子写入这个列表。
 
     file_path = 'single_factor_test.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
-    end_date = '2018-09-30'
+    end_date = '2016-09-30'
 
     for factor in factor_list:
         startegy_name = factor
-        FactorCode = [factor]  # 修改全局变量
+        FactorCode = [factor]  # 修改全局变量，改变测试的因子
         print(FactorCode)
         try:
             run_backtest(strategy_name=startegy_name, file_path=file_path,
                         target_list=list(get_code_list('hs300', date=begin_date)['code']),
                         frequency='day', fre_num=1, begin_date=begin_date, end_date=end_date, fq=1)
         except Exception:
-            print("该因子回测报告出错,跳过。")
+            print("该因子回测报告出错,跳过。请检查AT是否打开！")
             pass
 
     """
