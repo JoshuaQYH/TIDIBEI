@@ -32,6 +32,7 @@
 - `get_factor_report.py`: 当单因子回测结束之后，执行文件，得到策略字段。
 - `single_factor_test.py`: 单因子测试文件。
 - `find_factor.py`: 自实现的因子绩效分析文件(**已弃用**)
+- `run_test.bat`: 脚本自动化运行python程序，实现多次执行策略。
 
 
 
