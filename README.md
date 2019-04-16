@@ -12,12 +12,16 @@
 - 筛选得到最优因子。
 - 因子做共线性分析，获取最终因子。
 
+> _**官方提示：**_ 单因子问题，可以手动实现一下，或者可以弱化一下，通过间接的方法去实现这个问题，并不一定要实现一个完整的回测框架才能解决单因子分析的问题
+
 ### 选用机器学习模型回测
 - 特征和标签构建。
 - 等权重线性模型。
 - 建立baseline models，尝试使用多种模型。SVR，RNN(LSTM)，xgboost, random_forest...
 - 交易逻辑确定。
 - 回测结果记录，分析。
+
+> _**官方提示：**_ random forest, SVM, Adaboost, etc.
 
 ### 风险控制
 ...
@@ -38,3 +42,7 @@
 - [头寸解释](https://wiki.mbalib.com/wiki/%E5%A4%B4%E5%AF%B8)
 - [阮一峰常用git命令清单](http://www.ruanyifeng.com/blog/2015/12/git-cheat-sheet.html)
 - [点宽因子数据字典](https://www.digquant.com.cn/documents/23)
+- [名词解释：IC/IR](https://xueqiu.com/1652627245/108835836)
+- [名词解释：alpha值/beta值](https://blog.csdn.net/yezi113yezi/article/details/81078128)
+- [A题华师现场解读](https://edu.tipdm.org/)
+- [人工智能阿尔法策略框架-对282个因子的分析](https://www.jiqizhixin.com/articles/2019-01-26-5)
