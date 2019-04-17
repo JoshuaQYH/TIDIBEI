@@ -16,15 +16,15 @@
 :: 净利息费用 !
 ::python single_factor_test.py NetIntExpense
 :: 价值变动净收益
-python single_factor_test.py ValueChgProfit
+::python single_factor_test.py ValueChgProfit
 :: 留存收益
-python single_factor_test.py RetainedEarnings
+::python single_factor_test.py RetainedEarnings
 :: 财务费用 !
-python single_factor_test.py FinanExpenseTTM
+::python single_factor_test.py FinanExpenseTTM
 :: 管理费用 !
-python single_factor_test.py AdminExpenseTTM
+::python single_factor_test.py AdminExpenseTTM
 :: 净利润
-python single_factor_test.py NetProfitTTM
+::python single_factor_test.py NetProfitTTM
 
 :: 质量类 -------------------------------------- 该类可结束测试
 :: 产权比率 !
@@ -47,19 +47,19 @@ python single_factor_test.py NetProfitTTM
 ::python single_factor_test.py DividendPaidRatio
 
 :: 收益风险类---------------------------------- 该类效果极差
-:: 60日方差 !
+:: 60日方差
 ::python single_factor_test.py Variance60
-:: 股价偏度 !
+:: 股价偏度
 ::python single_factor_test.py Skewness20
-:: 历史波动 !
+:: 历史波动
 ::python single_factor_test.py HSIGMA
-:: 20日信息比率 !
+:: 20日信息比率
 ::python single_factor_test.py InformationRatio20
-:: 20日夏普率 !
+:: 20日夏普率
 ::python single_factor_test.py Sharperatio20
-:: 历史贝塔 !
+:: 历史贝塔
 ::python single_factor_test.py HBETA
-:: 下跌贝塔 !
+:: 下跌贝塔
 ::python single_factor_test.py DDNBT
 :: 20日收益方差
 ::python single_factor_test.py GainVariance20
@@ -73,6 +73,70 @@ python single_factor_test.py NetProfitTTM
 ::python single_factor_test.py BackwardADJ
 :: 个股20日 alpha
 ::python single_factor_test.py CAPMAlpha20
+
+:: 个股收益的120日峰度
+::python single_factor_test.py Kurtosis120
+:: 个股收益的60日峰度
+::python single_factor_test.py Kurtosis60
+:: 个股收益的20日峰度
+::python single_factor_test.py Kurtosis20
+:: 下跌贝塔
+::python single_factor_test.py DDNBT
+:: 下跌相关系数
+:: python single_factor_test.py DDNCR
+:: 下跌波动
+::python single_factor_test.py DDNSR
+:: 60日信息比率
+::python single_factor_test.py InformationRatio60
+:: 60日夏普率
+::python single_factor_test.py Sharperatio60
+
+:: 120日信息比率
+python single_factor_test.py InformationRatio120
+:: 120日夏普率
+python single_factor_test.py Sharperatio120
+:: 120 日特诺雷比
+python single_factor_test.py Treynorratio120
+:: 120日 beta
+python single_factor_test.py Beta120
+:: 12 个月累计收益范围的对数
+python single_factor_test.py CMRA12
+:: 60日收益方差
+python single_factor_test.py GainVariance60
+:: 120日损失方差
+python single_factor_test.py LossVariance120
+:: 120日收益损失方差比
+python single_factor_test.py GainLossVarianceratio120
+
+:: 情绪类 -------------------
+:: 20日成交金额的移动平均值
+python single_factor_test.py TVMA20
+:: 20日平均换手率
+python single_factor_test.py VOL20
+:: 20日成交量标准差
+python single_factor_test.py VSTD20
+:: 正成交量指标
+python single_factor_test.py PVI
+:: 成交量比率
+python single_factor_test.py VR
+:: 20日资金流量
+python single_factor_test.py MONEYFLOW20
+:: 20日收集派发指标
+python single_factor_test.py ACD20
+:: 人气指标
+python single_factor_test.py AR
+:: 20日能量潮指标
+python single_factor_test.py OBV20
+:: 阶段强势指标
+python single_factor_test.py JDQS20
+:: 资本利得突出量
+python single_factor_test.py CGO_10
+:: 显著性因子 20
+python single_factor_test.py ST_20
+:: 综合效用因子 20
+python single_factor_test.py TK_20
+:: 抢跑因子
+python single_factor_test.py FR_pure
 
 
 
