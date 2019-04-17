@@ -92,51 +92,51 @@
 ::python single_factor_test.py Sharperatio60
 
 :: 120日信息比率
-python single_factor_test.py InformationRatio120
+::python single_factor_test.py InformationRatio120
 :: 120日夏普率
-python single_factor_test.py Sharperatio120
+::python single_factor_test.py Sharperatio120
 :: 120 日特诺雷比
-python single_factor_test.py Treynorratio120
+::python single_factor_test.py Treynorratio120
 :: 120日 beta
-python single_factor_test.py Beta120
+::python single_factor_test.py Beta120
 :: 12 个月累计收益范围的对数
-python single_factor_test.py CMRA12
+::python single_factor_test.py CMRA12
 :: 60日收益方差
-python single_factor_test.py GainVariance60
+::python single_factor_test.py GainVariance60
 :: 120日损失方差
-python single_factor_test.py LossVariance120
+::python single_factor_test.py LossVariance120
 :: 120日收益损失方差比
-python single_factor_test.py GainLossVarianceratio120
+::python single_factor_test.py GainLossVarianceratio120
 
 :: 情绪类 -------------------
 :: 20日成交金额的移动平均值
-python single_factor_test.py TVMA20
+::python single_factor_test.py TVMA20
 :: 20日平均换手率
-python single_factor_test.py VOL20
+::python single_factor_test.py VOL20
 :: 20日成交量标准差
-python single_factor_test.py VSTD20
+::python single_factor_test.py VSTD20
 :: 正成交量指标
-python single_factor_test.py PVI
+::python single_factor_test.py PVI
 :: 成交量比率
-python single_factor_test.py VR
+::python single_factor_test.py VR
 :: 20日资金流量
-python single_factor_test.py MONEYFLOW20
+::python single_factor_test.py MONEYFLOW20
 :: 20日收集派发指标
-python single_factor_test.py ACD20
+::python single_factor_test.py ACD20
 :: 人气指标
-python single_factor_test.py AR
+::python single_factor_test.py AR
 :: 20日能量潮指标
-python single_factor_test.py OBV20
+::python single_factor_test.py OBV20
 :: 阶段强势指标
-python single_factor_test.py JDQS20
+::python single_factor_test.py JDQS20
 :: 资本利得突出量
-python single_factor_test.py CGO_10
+::python single_factor_test.py CGO_10
 :: 显著性因子 20
-python single_factor_test.py ST_20
+::python single_factor_test.py ST_20
 :: 综合效用因子 20
-python single_factor_test.py TK_20
+::python single_factor_test.py TK_20
 :: 抢跑因子
-python single_factor_test.py FR_pure
+::python single_factor_test.py FR_pure
 
 
 
