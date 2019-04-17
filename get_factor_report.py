@@ -5,7 +5,7 @@ import pandas as pd
 修改输出的csv文件名！！！！！！
 注意不要重复，可能会覆盖原来的文件！！！
 """
-csv_file = "strategy.csv"
+csv_file = "strategy1.csv"
 
 strategy_dicts = at.get_strategy_id()
 save_dict = {"测试因子": [],

@@ -155,10 +155,10 @@ def on_data(context):
     训练集和测试集的表头字段如下
     FactorData DataFrame:
     idx  |  benefit |  Factor 1 | Factor 2| ....
-    benefit 作为标签，Factor作为特征，此处是单因子测试，只有一个特征
-    FactorDataTest DataFrame:
+    benefit 作为标签，上月初Factor作为特征，此处是单因子测试，只有一个特征
+    FactorDataTest DataFrame: 
     idx | Factor 1 | Factor 2 | ...
-    
+    本月初的因子作为预测特征
     """
 
     # 数据清洗：
@@ -168,10 +168,10 @@ def on_data(context):
 
     # 按特征进行预处理
     for Factor in context.FactorCode:
-        FactorData = filter_MAD(FactorData, Factor, 3)  # 中位数去极值法
+        FactorData = filter_MAD(FactorData, Factor, 5)  # 中位数去极值法
         FactorData[Factor] = preprocessing.scale(FactorData[Factor])  # 标准化
 
-        FactorDataTest = filter_MAD(FactorDataTest, Factor, 3)  # 中位数去极值法
+        FactorDataTest = filter_MAD(FactorDataTest, Factor, 5)  # 中位数去极值法
         FactorDataTest[Factor] = preprocessing.scale(FactorDataTest[Factor])  # 标准化
 
     # print(FactorData.head(1))
