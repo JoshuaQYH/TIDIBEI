@@ -221,5 +221,3 @@ python single_factor_test.py STDDEV
 python single_factor_test.py TSF
 
 ::python get_factor_report.py 特色技术指标
-
-::python get_factor_report.py last4
