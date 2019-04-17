@@ -139,85 +139,80 @@
 ::python single_factor_test.py FR_pure
 
 
-
 :: 模式识别类 -----------------------------------
 :: 藏婴吞没（CDLCONCEALBABYSWALL）
-python single_factor_test.py CDLCONCEALBABYSWALL
+::python single_factor_test.py CDLCONCEALBABYSWALL
 :: 射击之星（CDLSHOOTINGSTAR）
-python single_factor_test.py CDLSHOOTINGSTAR
+::python single_factor_test.py CDLSHOOTINGSTAR
 :: 十字暮星（CDLEVENINGDOJISTAR）
-python single_factor_test.py CDLEVENINGDOJISTAR
+::python single_factor_test.py CDLEVENINGDOJISTAR
 :: 吞噬模式（CDLENGULFING）
-python single_factor_test.py CDLENGULFING
+::python single_factor_test.py CDLENGULFING
 :: 刺透形态（CDLPIERCING）
-python single_factor_test.py CDLPIERCING
+::python single_factor_test.py CDLPIERCING
 :: 倒锤头（CDLINVERTEDHAMMER）
-python single_factor_test.py CDLINVERTEDHAMMER
+::python single_factor_test.py CDLINVERTEDHAMMER
 
-::python get_factor_report.py 模式识别类
 
 :: 每股指标类 ----------------------------------
 :: 基本每股收益（BasicEPS）
-python single_factor_test.py BasicEPS
+::python single_factor_test.py BasicEPS
 :: 每股收益TTM值（EPS）
-python single_factor_test.py EPS
+::python single_factor_test.py EPS
 :: 每股净资产（NetAssetPS）
-python single_factor_test.py NetAssetPS
+::python single_factor_test.py NetAssetPS
 :: 每股营业总收入（TORPS）
-python single_factor_test.py TORPS
+::python single_factor_test.py TORPS
 :: 每股营业利润（OperatingProfitPS）
-python single_factor_test.py OperatingProfitPS
+::python single_factor_test.py OperatingProfitPS
 :: 每股息税前利润（EBITPS）
-python single_factor_test.py EBIPTS
+::python single_factor_test.py EBIPTS
 :: 每股现金流量净额（CashFlowPS）
-python single_factor_test.py CashFlowPS
+::python single_factor_test.py CashFlowPS
 :: 每股企业自由现金流量（EnterpriseFCFPS）
-python single_factor_test.py EnterpriseFCFPS
+::python single_factor_test.py EnterpriseFCFPS
 
-::python get_factor_report.py 每股指标类
 
 :: 行业与分析师类 ------------------------------
 :: 12月相对强势(RSTR12)
-python single_factor_test.py RSTR12
+::python single_factor_test.py RSTR12
 :: 24月相对强势(RSTR24)
-python single_factor_test.py RSTR24
+::python single_factor_test.py RSTR24
 :: 分析师盈利预测（FY12P）
-python single_factor_test.py FY12P
+::python single_factor_test.py FY12P
 :: 分析师营收预测（SFY12P）
-python single_factor_test.py SFY12P
+::python single_factor_test.py SFY12P
 :: （PB–PB的行业均值）/PB的行业标准差（PBIndu）
-python single_factor_test.py PBIndu
+::python single_factor_test.py PBIndu
 :: PCF–PCF的行业均值）/PCF的行业标准差（PCFIndu）
-python single_factor_test.py PCFIndu
+::python single_factor_test.py PCFIndu
 ::（PE–PE的行业均值）/PE的行业标准差（PEIndu）
-python single_factor_test.py PEIndu
+::python single_factor_test.py PEIndu
 :: （PS–PS的行业均值）/PS的行业标准差（PSIndu）
-python single_factor_test.py PSIndu
+::python single_factor_test.py PSIndu
 :: 投资回报率预测（EPIBS）
-python single_factor_test.py EPIBS
+::python single_factor_test.py EPIBS
 :: 未来预期盈利增长（FEARNG）
-python single_factor_test.py FEARNG
+::python single_factor_test.py FEARNG
 :: 未来预期盈收增长（FSALESG）
-python single_factor_test.py FSALESG
+::python single_factor_test.py FSALESG
 :: 长期盈利增长预测（EgibsLong）
-python single_factor_test.py EgibsLong
+::python single_factor_test.py EgibsLong
 
 ::python get_factor_report.py 行业与分析师类
 
 :: 特色技术指标 --------------------------------
 :: 绝对价格振荡器(APO)
-python single_factor_test.py APO
+::python single_factor_test.py APO
 :: 平均价格(AVGPRICE)
-python single_factor_test.py AVGPRICE
+::python single_factor_test.py AVGPRICE
 :: 均势指标(BOP)
-python single_factor_test.py BOP
+::python single_factor_test.py BOP
 :: 考夫曼自适应移动平均线（KAMA）
-python single_factor_test.py KAMA
+::python single_factor_test.py KAMA
 :: 线性回归（LINEARREG）
-python single_factor_test.py LINEARREG
+::python single_factor_test.py LINEARREG
 :: 标准差(STDDEV)
-python single_factor_test.py STDDEV
+::python single_factor_test.py STDDEV
 :: 时间序列预测（TSF）
-python single_factor_test.py TSF
-
-::python get_factor_report.py 特色技术指标
+::python single_factor_test.py TSF
