@@ -5,16 +5,16 @@
 2. 回测时间段：2016-01-01 至 2018-09-30
 3. 特征选择：待测单因子
 4. 单因子回归测试模型思路：
-    1. 先获得 30 天以上的K线数据和因子数据，预处理
-    2. 使用月末因子和本月收益率进行线性回归
+    1. 先获得 21 天以上的K线数据和因子数据，预处理
+    2. 使用上月初因子和上月收益率进行线性回归
     3. 使用单变量线性模型进行训练
-    4. 回到当前时间点，使用前 1 天的因子数据作为预测样本特征，预测后 30 天的各股票平均收益率的大小。
+    4. 回到当前时间点，使用本月初的因子作为预测样本特征，预测本月的各股票平均收益率的大小。
 5. 选股逻辑：
-    将符合预测结果的股票按均等分配可用资金进行下单交易。持有 一个月后 ，再次进行调仓，训练预测。
+    将符合预测结果的股票按均等分配可用资金进行下单交易。持有一个月后 ，再次进行调仓，训练预测。
 6. 交易逻辑：
     每次调仓时，若当前有持仓，并且符合选股条件，则仓位不动；
-                              若不符合选股条件，则对收益最低的25%标的进行仓位平仓；
-                若当前无仓，并且符合选股条件，则多开仓，对收益最高的25%标的进行开仓；
+                              若不符合选股条件，则对收益低的标的进行仓位平仓；
+                若当前无仓，并且符合选股条件，则多开仓，对收益高的标的进行开仓；
                             若不符合选股条件，则不开仓，无需操作。
 
 ---------------------------------------------------------
@@ -73,17 +73,13 @@ def init(context):
     context.FactorCode = FactorCode  #
 
     # 超参数设置：
-    context.Len = 50  # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日
-    # 我们的目的就是使用前30天的因子数据作为样本，未来10天的股票收益率作为标签，进行回归。
-    # 在前50天，可以取多组样本和标签，构成回归测试的数据
-    context.N1 = 1    # 训练样本的时间跨度，代表训练的天数  // 过高过低都不太好，过高可能有噪声，过低数据特征不明显
-    context.N2 = 30   # 标签的时间跨度,代表预测未来的天数  //
+    context.Len = 21    # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日，假设平均每个月 21 个交易日左右  250/12
     context.Num = 0   # 记录当前交易日个数
 
+    # 较敏感的超参数，需要调节
     context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 50   # 股票预测收益率的下分位数，低于则卖出
-
-    context.cash_rate = 0.8  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
+    context.down_pos = 60   # 股票预测收益率的下分位数，低于则卖出
+    context.cash_rate = 0.6  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓
     days = get_trading_days('SSE', '2016-01-01', '2018-09-30')
@@ -105,77 +101,96 @@ def on_data(context):
                            df=True)  # 获取因子数据
 
     # 特征构建：
-    Fcode = list()
-    for i in range(context.N1):
-        for FC in context.FactorCode:
-            Fcode.append(FC + str(i))  # 因子 + 序号
+    Fcode = context.FactorCode  # 标签不需要代号了
 
     # 数据存储变量：
-    FactorData = pd.DataFrame(columns=(['idx', 'signClose'] + Fcode))  # 存储训练特征及标签样本
-    FactorDataTest = pd.DataFrame(columns=(['idx'] + Fcode))  # 存储预测特征样本
+    # Close 字段为标签，Fcode 为标签
+    FactorData = pd.DataFrame(columns=(['idx', 'benefit'] + Fcode))  # 存储训练特征及标签样本
+    FactorDataTest = pd.DataFrame(columns=(['idx'] + Fcode))       # 存储预测特征样本
 
-    # 序号：
+    # K线数据序号对齐
     tempIdx = KData[KData['time'] == KData['time'][0]]['target_idx'].reset_index(drop=True)
 
     # 按标的处理数据：
     for i in range(300):
         # 训练特征集及训练标签构建：
         # 临时数据存储变量:
-        FactorData0 = pd.DataFrame(
-            columns=(['idx', 'signClose'] + Fcode))
-        FactorDataTest0 = pd.DataFrame(np.full([1, len(Fcode) + 1], np.nan), columns=(['idx'] + Fcode))  # 存储预测特征样本
+        FactorData0 = pd.DataFrame(np.full([1, len(Fcode) + 2], np.nan),
+            columns=(['idx', 'benefit'] + Fcode))
+        # 存储预测特征样本
+        FactorDataTest0 = pd.DataFrame(np.full([1, len(Fcode) + 1], np.nan), columns=(['idx'] + Fcode))
 
-        # 序号对齐
+        # 因子数据 序号对齐, 提取当前标的的因子数据
         FData0 = FData[FData['target_idx'] == tempIdx[i]].reset_index(drop=True)
 
-        # FData0.dropna(axis=0)  # 删除因子缺失的股票
-        FData0 = filter_MAD(FData0, "value", 3)  # 中位数去极值法
-        # FData0["value"] = preprocessing.scale(FData0["value"])  # 标准化
-
         # 按特征处理数据：
         for FC in context.FactorCode:
+            # 提取当前标的中与当前因子FC相同的部分
             FCData = FData0[FData0['factor'] == FC]['value'].reset_index(drop=True)
-            for k in range(context.N1):
-                FactorData0[FC + str(k)] = FCData[k:k + context.Len - context.N1 - context.N2]
+            FactorData0[FC] = FCData[0]  # 存储上一个月初的股票因子数据
 
         # 按标签处理数据：
+        # 提取当前标的的前一个月的K线面板数据
         close = np.array(KData[KData['target_idx'] == tempIdx[i]]['close'])
-        # 将N2内的天收益率作为标签
-        signValue = np.sign((close[context.N1 + context.N2:] -
-                             close[context.N1:context.Len - context.N2]) / close[context.N1:context.Len - context.N2])
+        # 计算当前标的在上一个月的收益率
+        benefit = (close[context.Len - 1] - close[0]) / close[0]
 
-        FactorData0['signClose'] = signValue
-        # idx:
+        FactorData0['benefit'] = benefit
+        # idx: 建立当前标的在训练样本集中的索引
         FactorData0['idx'] = tempIdx[i]
-        # 合并数据：
+        # 合并数据：组成训练样本
         FactorData = FactorData.append(FactorData0, ignore_index=True)
 
-        # 预测特征集构建：
+        # 预测特征集构建：建立标的索引
         FactorDataTest0['idx'] = tempIdx[i]
-        # 按特征处理数据：
+        # 按特征处理数据，过程同建立训练特征
         for FC in context.FactorCode:
             FCData = FData0[FData0['factor'] == FC]['value'].reset_index(drop=True)
-            for k in range(context.N1):
-                FactorDataTest0[FC + str(k)] = FCData[context.Len - context.N1 + k]
+            FactorDataTest0[FC] = FCData[context.Len - 1]
+
+        # 合并测试数据
         FactorDataTest = FactorDataTest.append(FactorDataTest0, ignore_index=True)
-        print(i)
+
+    """
+    训练集和测试集的表头字段如下
+    FactorData DataFrame:
+    idx  |  benefit |  Factor 1 | Factor 2| ....
+    benefit 作为标签，Factor作为特征，此处是单因子测试，只有一个特征
+    FactorDataTest DataFrame:
+    idx | Factor 1 | Factor 2 | ...
+    
+    """
 
     # 数据清洗：
     FactorData = FactorData.dropna(axis=0, how='any').reset_index(drop=True)  # 清洗数据
     FactorDataTest = FactorDataTest.dropna(axis=0, how='any').reset_index(drop=True)  # 清洗数据
     Idx = FactorDataTest['idx']  # 剩余标的序号
 
-    # 预测特征构建：
+    # 按特征进行预处理
+    for Factor in context.FactorCode:
+        FactorData = filter_MAD(FactorData, Factor, 3)  # 中位数去极值法
+        FactorData[Factor] = preprocessing.scale(FactorData[Factor])  # 标准化
+
+        FactorDataTest = filter_MAD(FactorDataTest, Factor, 3)  # 中位数去极值法
+        FactorDataTest[Factor] = preprocessing.scale(FactorDataTest[Factor])  # 标准化
+
+    # print(FactorData.head(1))
+    # print(FactorDataTest.head(1))
+
+    # 训练和预测特征构建：# 行（样本数）* 列（特征数）
     X = np.ones([FactorData.shape[0], len(Fcode)])
     Xtest = np.ones([FactorDataTest.shape[0], len(Fcode)])
+
+    # 循环填充特征到numpy数组中
     for i in range(X.shape[1]):
         X[:, i] = FactorData[Fcode[i]]
         Xtest[:, i] = FactorDataTest[Fcode[i]]
 
-    Y = np.array(FactorData['signClose']).astype(int)
+    # 训练样本的标签，为浮点数的收益率
+    Y = np.array(FactorData['benefit']).astype(float)
 
-    # 构建模型： 这一步放在了 init里头，模型成为全局变量
-    LRModel = LinearRegression()
+    # 构建模型：
+    LRModel = LinearRegression(normalize=True)
 
     # 模型训练：
     LRModel.fit(X, Y)
@@ -195,7 +210,7 @@ def on_data(context):
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
         if position == 0 and y[i] > high_return and valid_cash > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
-            # 开仓数量 + 100防止开仓数量为0  + 1防止分母为0
+            # 开仓数量 + 1防止分母为0
             # print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
             Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100)
 
@@ -209,8 +224,10 @@ def on_data(context):
                 continue
 
             print("开仓数量为：{}".format(Num))
-            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,
+            order_id = order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,
                          price=0)  # 指定委托量开仓
+            # 对订单号为order_id的委托单设置止损，止损距离10个整数点，触发时，委托的方式用市价委托
+            # stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=10, order_type=2)
 
         elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
             #print("平仓")
