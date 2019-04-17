@@ -63,7 +63,7 @@ def filter_MAD(df, factor, n=3):
 
 def init(context):
     # 账号设置：设置初始资金为 10000000 元
-    set_backtest(initial_cash=1000000, future_cost_fee=1.0, stock_cost_fee=30, margin_rate=1.0, slide_price=0.0,
+    set_backtest(initial_cash=10000000, future_cost_fee=1.0, stock_cost_fee=30, margin_rate=1.0, slide_price=0.0,
                  price_loc=1, deal_type=0, limit_type=0)
     # 注册数据：日频数据
     reg_kdata('day', 1)
@@ -80,8 +80,10 @@ def init(context):
     context.N2 = 30   # 标签的时间跨度,代表预测未来的天数  //
     context.Num = 0   # 记录当前交易日个数
 
-    context.upper_pos = 75  # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 25   # 股票预测收益率的下分位数，低于则卖出
+    context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
+    context.down_pos = 50   # 股票预测收益率的下分位数，低于则卖出
+
+    context.cash_rate = 0.8  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓
     days = get_trading_days('SSE', '2016-01-01', '2018-09-30')
@@ -185,23 +187,26 @@ def on_data(context):
     positions = context.account().positions['volume_long']  # 多头持仓数量
     valid_cash = context.account(account_idx=0).cash['valid_cash'][0]  # 可用资金
 
-    P = 0.6 / (sum(y > 0) + 1)  # 设置每只标的可用资金比例 + 1 防止分母为0
+    P = context.cash_rate / (sum(y > 0) + 1)  # 设置每只标的可用资金比例 + 1 防止分母为0
 
-    # 获取收益率的高四分位数和低四分位数
-    high_return, low_return = np.percentile(y, [30, 70])
+    # 获取收益率的高分位数和低分位数
+    high_return, low_return = np.percentile(y, [context.down_pos, context.upper_pos])
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
         if position == 0 and y[i] > high_return and valid_cash > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
             # 开仓数量 + 100防止开仓数量为0  + 1防止分母为0
-            print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
-            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100) + 100
+            # print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
+            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100)
 
-            # 控制委托量区间
+            # 控制委托量，不要过大或过小,需要保证是100的倍数
             if Num < 1000:
                 Num *= 10
             if Num > 100000:
                 Num = int(Num / 10)
+                Num -= Num % 100
+            if Num <= 0:  # 不开仓
+                continue
 
             print("开仓数量为：{}".format(Num))
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,

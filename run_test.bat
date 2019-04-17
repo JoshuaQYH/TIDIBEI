@@ -23,8 +23,6 @@ python single_factor_test.py SuperQuickRatio
 python single_factor_test.py CashToCurrentLiability
 :: 流动资产周转率
 python single_factor_test.py CurrentAssetsRate
-:: 流动资产周转率
-python single_factor_test.py CurrentAssetsRate
 :: 投入资本回报率
 python single_factor_test.py ROIC
 :: 利息保障倍数
