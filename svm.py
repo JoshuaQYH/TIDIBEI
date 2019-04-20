@@ -16,7 +16,6 @@
     - 成长类：TotalAssetGrowRate
     - 常用技术类：MA120
 ... 其余逻辑参照single_factor_test.py
-
 ----------------------------------------------------------
 """
 from atrader import *
@@ -203,7 +202,7 @@ def on_data(context):
         position = positions.iloc[Idx[i]]
         if position == 0 and y[i] == True and valid_cash > 0:  # 若预测结果为true(收益率>0)，买入
             # print('开仓')
-        #if position == 0 and y[i] > high_return and valid_cash > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
+        # if position == 0 and y[i] > high_return and valid_cash > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
             # 开仓数量 + 1防止分母为0
             # print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
             Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100)
@@ -223,7 +222,7 @@ def on_data(context):
             # 对订单号为order_id的委托单设置止损，止损距离10个整数点，触发时，委托的方式用市价委托
             # stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=10, order_type=2)
         elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
-        #elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
+        # elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
             # print("平仓")
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position), side=2, position_effect=2,
                          order_type=2, price=0)  # 指定委托量平仓
