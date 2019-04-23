@@ -69,9 +69,9 @@ def init(context):
     context.FactorCode = FactorCode
 
     # 参数设置：
-    context.LEN = 10  # 时间窗口滑动最大范围
-    context.N1 = 5    # 时间窗口中的训练/预测特征部分
-    context.N2 = 3    # 时间窗口中的训练标签部分
+    context.LEN = 45  # 时间窗口滑动最大范围
+    context.N1 = 20    # 时间窗口中的训练/预测特征部分
+    context.N2 = 20    # 时间窗口中的训练标签部分
     context.Num = 0    # 记录当前交易日个数， 保证交易日个数需要大于时间窗口滑动的最大范围
 
     # 较敏感的超参数，需要调节
@@ -209,29 +209,26 @@ def on_data(context):
     FactorDataTest = FactorDataTest.dropna(axis=0, how='any').reset_index(drop=True)  # 清洗数据
     Idx = FactorDataTest['idx']  # 剩余标的序号
 
-    print(FactorDataTest.head(10))
-
     # 按特征进行预处理
-    for Factor in context.FactorCode:
+    for Factor in Fcode:
         # 处理多个时间窗口的训练数据。
         for window in range(len(FactorData_list)):
-            for i in range(context.N1):
-                FactorData_list[window] = filter_MAD(FactorData_list[window], Factor + '-' + str(i), 5)  # 中位数去极值法
-                FactorData_list[window][Factor + '-' + str(i)] = preprocessing.scale(FactorData_list[window][Factor + '-' + str(i)])  # 标准化
-        for i in range(context.N1):
-            FactorDataTest = filter_MAD(FactorDataTest, Factor + '-' + str(i), 5)  # 中位数去极值法
-            FactorDataTest[Factor] = preprocessing.scale(FactorDataTest[Factor + '-' + str(i)])  # 标准化
+            FactorData_list[window] = filter_MAD(FactorData_list[window], Factor, 5)  # 中位数去极值法
+            FactorData_list[window][Factor] = preprocessing.scale(FactorData_list[window][Factor])  # 标准化
+
+        FactorDataTest = filter_MAD(FactorDataTest, Factor, 5)  # 中位数去极值法
+        FactorDataTest[Factor] = preprocessing.scale(FactorDataTest[Factor])  # 标准化
 
     # 训练和预测特征构建：# 行（样本数）* 列（特征数）
     for window in range(len(FactorData_list)):
         X = np.ones([FactorData_list[window].shape[0], len(Fcode)])
-
+        print(FactorData_list[window])
         # 循环填充特征到numpy数组中
         for i in range(X.shape[1]):
-            X[:, i] = FactorData[Fcode[i]]
+            X[:, i] = FactorData_list[window][Fcode[i]]
 
         # 训练样本的标签，为浮点数的收益率
-        Y = (np.array(FactorData['benefit']).astype(float) > 0)
+        Y = (np.array(FactorData_list[window]['benefit']).astype(float) > 0)
 
         # 模型训练：
         print("FITTING!")
