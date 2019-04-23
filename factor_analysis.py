@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 def draw_heatmap(df, filename):
     dfData = df.corr()
-    plt.subplots(figsize=(9, 9))
+    plt.subplots(figsize=(13, 13))
     sns.heatmap(dfData, annot=True, vmax=1, vmin=0, square=True, cmap='Blues')
     plt.savefig(filename)
     plt.show()
@@ -77,6 +77,8 @@ if __name__ == '__main__':
                    ]
 
     for i, factor in enumerate(factor_list):
+        if i != 1:
+            continue
         print(file_name_list[i])
         analysis_factor(factor, code_list, file_name_list[i])  # 最终得到因子相关系数矩阵
 

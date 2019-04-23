@@ -27,9 +27,11 @@ from sklearn import preprocessing
 import datetime
 
 # 作为全局变量进行测试
+
 FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'TVMA20', 'EnterpriseFCFPS',
               'PS', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'GrossProfit', 'FY12P',
               'AD', 'TotalAssetGrowRate', 'MA120']
+
 # , 'NetIntExpense', 'GrossProfit'
 #print("传入因子参数为", 'AdminExpenseTTM', 'FinanExpenseTTM')
 
@@ -205,7 +207,7 @@ def on_data(context):
         # if position == 0 and y[i] > high_return and valid_cash > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
             # 开仓数量 + 1防止分母为0
             # print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
-            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100)
+            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i] * 21 + 20] + 1)) * 100)
 
             # 控制委托量，不要过大或过小,需要保证是100的倍数
             if Num < 1000:

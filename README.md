@@ -39,7 +39,7 @@
 - `single_factor_test.py`: 单因子测试文件。
 - `find_factor.py`: 自实现的因子绩效分析文件(**已弃用**)
 - `run_test.bat`: 脚本自动化运行python程序，实现多次执行策略。
-
+- 'factor_analysis': 类内因子共线性分析文件，绘制相关系数矩阵。
 
 ## LINK 
 - [AutoTrader 官方API文档](https://www.digquant.com.cn/documents/17#h1-u5FEBu901Fu5F00u59CB-0)
