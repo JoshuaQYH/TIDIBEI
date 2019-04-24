@@ -221,38 +221,38 @@
 
 
 ::成长类因子（部分） --------------------------------
-python single_factor_test.py OperatingRevenueGrowRate
-python single_factor_test.py TotalAssetGrowRate
-python single_factor_test.py EGRO
-python single_factor_test.py FinancingCashGrowRate
-python single_factor_test.py NPParentCompanyGrowRate
-python single_factor_test.py NetProfitGrowRate
-python single_factor_test.py SGRO
-python single_factor_test.py TotalProfitGrowRate
+::python single_factor_test.py OperatingRevenueGrowRate
+::python single_factor_test.py TotalAssetGrowRate
+::python single_factor_test.py EGRO
+::python single_factor_test.py FinancingCashGrowRate
+::python single_factor_test.py NPParentCompanyGrowRate
+::python single_factor_test.py NetProfitGrowRate
+::python single_factor_test.py SGRO
+::python single_factor_test.py TotalProfitGrowRate
 
 
 
 ::常用技术指标因子（部分） --------------------------------
-python single_factor_test.py MA10
-python single_factor_test.py MA120
-python single_factor_test.py MTM
-python single_factor_test.py DBCD
-python single_factor_test.py EMA12
-python single_factor_test.py CR20
-python single_factor_test.py UOS
-python single_factor_test.py CHAIKINVOLATILITY
+::python single_factor_test.py MA10
+::python single_factor_test.py MA120
+::python single_factor_test.py MTM
+::python single_factor_test.py DBCD
+::python single_factor_test.py EMA12
+::python single_factor_test.py CR20
+::python single_factor_test.py UOS
+::python single_factor_test.py CHAIKINVOLATILITY
 
 
 
 ::动量类因子（部分） --------------------------------
-python single_factor_test.py BIAS20
-python single_factor_test.py CMO
-python single_factor_test.py PVT
-python single_factor_test.py CCI5
-python single_factor_test.py SRMI
-python single_factor_test.py CMOSD
-python single_factor_test.py BEARPOWER
-python single_factor_test.py AD
+::python single_factor_test.py BIAS20
+::python single_factor_test.py CMO
+::python single_factor_test.py PVT
+::python single_factor_test.py CCI5
+::python single_factor_test.py SRMI
+::python single_factor_test.py CMOSD
+::python single_factor_test.py BEARPOWER
+::python single_factor_test.py AD
 
 
 

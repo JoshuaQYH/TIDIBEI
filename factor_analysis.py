@@ -62,23 +62,22 @@ if __name__ == '__main__':
     A = at.get_code_list('hs300', date='2016-01-01')
     code_list = A['code'].tolist()
 
-    file_name_list = ["基础类", "质量类", "情绪类", "价值类", "每股指标类",
-                      "行业分析师类", "特色技术指标类"]
+    file_name_list = ["Q1_基础类", "Q1_质量类"]
+        #, "情绪类", "价值类", "每股指标类",
+        #              "行业分析师类", "特色技术指标类"]
 
-    factor_list = [['GrossProfit', 'WorkingCapital', 'TotalFixedAssets',
-                     'NetIntExpense', 'FinanExpenseTTM', 'AdminExpenseTTM'],  # 基础类
-                   ['DebtEquityRatio', 'SuperQuickRatio', 'CashToCurrentLiability',
-                   'ROIC', 'InterestCover', 'ROAEBIT'],  # 质量类
-                   ['TVMA20', 'VOL20', 'OBV20', 'JDQS20'],  # 情绪类
-                   ['PE', 'PB', 'PS', 'NLSIZE', 'TA2EV', 'CTOP'],  # 成长因子类
-                   ['BasicEPS', 'EPS', 'EnterpriseFCFPS'],  # 每股指标类
-                   ['RSTR24', 'FY12P', 'SFY12P', 'PEIndu', 'EPIBS'],  # 行业分析师类
-                   ['AVGPRICE', 'BOP', 'KAMA', 'LINEARREG', 'STDDEV']  # 特色技术指标类
-                   ]
+    factor_list = [['AdminExpenseTTM', 'NIAP', 'FinanExpenseTTM', 'NetIntExpense'],  # 基础类
+                   ['DebtEquityRatio', 'SuperQuickRatio']  # 质量类
+                  ]
+                 # ['TVMA20', 'VOL20', 'OBV20', 'JDQS20'],  # 情绪类
+                 #  ['PE', 'PB', 'PS', 'NLSIZE', 'TA2EV', 'CTOP'],  # 成长因子类
+                 #  ['BasicEPS', 'EPS', 'EnterpriseFCFPS'],  # 每股指标类
+                 #  ['RSTR24', 'FY12P', 'SFY12P', 'PEIndu', 'EPIBS'],  # 行业分析师类
+                 #  ['AVGPRICE', 'BOP', 'KAMA', 'LINEARREG', 'STDDEV']  # 特色技术指标类
 
     for i, factor in enumerate(factor_list):
-        if i != 1:
-            continue
+        #if i != 1:
+        #    continue
         print(file_name_list[i])
         analysis_factor(factor, code_list, file_name_list[i])  # 最终得到因子相关系数矩阵
 
