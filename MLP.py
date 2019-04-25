@@ -25,14 +25,12 @@ from sklearn import svm
 import math
 from sklearn import preprocessing
 import datetime
-from sklearn.decomposition import PCA
-from sklearn import linear_model
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.neural_network import MLPRegressor
 
 # 作为全局变量进行测试
-FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'PVI', 'EnterpriseFCFPS',
-              'PS', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'NIAP', 'FY12P',
+
+FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'TVMA20', 'EnterpriseFCFPS',
+              'PS', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'GrossProfit', 'FY12P',
               'AD', 'TotalAssetGrowRate', 'MA120']
 
 
@@ -72,9 +70,9 @@ def init(context):
     context.Num = 0   # 记录当前交易日个数
 
     # 较敏感的超参数，需要调节
-    context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
+    context.upper_pos = 85  # 股票预测收益率的上分位数，高于则买入
     context.down_pos = 60   # 股票预测收益率的下分位数，低于则卖出
-    context.cash_rate = 0.6  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
+    context.cash_rate = 0.7  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓
     days = get_trading_days('SSE', '2016-01-01', '2018-09-30')
@@ -169,9 +167,6 @@ def on_data(context):
         FactorDataTest = filter_MAD(FactorDataTest, Factor, 5)  # 中位数去极值法
         FactorDataTest[Factor] = preprocessing.scale(FactorDataTest[Factor])  # 标准化
 
-    # print(FactorData.head(1))
-    # print(FactorDataTest.head(1))
-
     # 训练和预测特征构建：# 行（样本数）* 列（特征数）
     X = np.ones([FactorData.shape[0], len(Fcode)])
     Xtest = np.ones([FactorDataTest.shape[0], len(Fcode)])
@@ -184,28 +179,15 @@ def on_data(context):
     # 训练样本的标签，为浮点数的收益率
     Y = (np.array(FactorData['benefit']).astype(float) > 0)
 
-    SVM = svm.SVR(gamma='scale')
-
-
-    gbr = GradientBoostingRegressor()
-    gbr.fit(X, Y)
-    enc = OneHotEncoder()
-    enc.fit(gbr.apply(X))
-
-    new_X = enc.transform(gbr.apply(X))
-    new_X = new_X.toarray()
-
-    X = new_X
-
-    new_Xtest = enc.transform(gbr.apply(Xtest))
-    new_Xtest = new_Xtest.toarray()
-    Xtest = new_Xtest
+    mlp = MLPRegressor(hidden_layer_sizes=6, activation='logistic', solver='adam',
+                        max_iter=50)
 
     # 模型训练：
-    SVM.fit(X, Y)
+    mlp.fit(X, Y)
 
     # LR分类预测：
-    y = SVM.predict(Xtest)
+    y = mlp.predict(Xtest)
+
     # 交易设置：
     positions = context.account().positions['volume_long']  # 多头持仓数量
     valid_cash = context.account(account_idx=0).cash['valid_cash'][0]  # 可用资金
@@ -217,9 +199,9 @@ def on_data(context):
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
-        #if position == 0 and y[i] == True and valid_cash > 0:  # 若预测结果为true(收益率>0)，买入
+        # if position == 0 and y[i] == True and valid_cash > 0:  # 若预测结果为true(收益率>0)，买入
             # print('开仓')
-        if position == 0 and y[i] > high_return and valid_cash > 0 and y[i] > 0:
+        if position == 0 and y[i] > high_return and valid_cash > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
             # 开仓数量 + 1防止分母为0
             # print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
             Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i] * 21 + 20] + 1)) * 100)
@@ -247,13 +229,13 @@ def on_data(context):
 
 if __name__ == '__main__':
 
-    file_path = 'svm.py'
+    file_path = 'MLP.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
     end_date = '2018-09-30'
 
-    strategy_name = 'svm'
+    strategy_name = 'MLP'
 
     run_backtest(strategy_name=strategy_name, file_path=file_path,
                  target_list=list(get_code_list('hs300', date=begin_date)['code']),

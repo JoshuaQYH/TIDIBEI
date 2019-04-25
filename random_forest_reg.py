@@ -7,12 +7,12 @@
     - 质量类：ROIC, CashToCurrentLiability
     - 特色技术指标：STDDEV
     - 收益风险：DDNCR
-    - 情绪类：TVMA20
+    - 情绪类：TVMA20/PVI
     - 每股指标类：EnterpriseFCFPS
     - 价值类：PS
-    - 基础类：AdminExpenseTTM, FinanExpenseTTM, NetIntExpense, GrossProfit
+    - 基础类：AdminExpenseTTM, FinanExpenseTTM, NetIntExpense, GrossProfit/NIAP
     - 行业分析师：FY12P
-    - 动量类：TotalAssetGrowRate
+    - 动量类：AD
     - 成长类：TotalAssetGrowRate
     - 常用技术类：MA120
 ... 其余逻辑参照single_factor_test.py
@@ -26,13 +26,14 @@ from sklearn.ensemble import RandomForestRegressor
 import math
 from sklearn import preprocessing
 import datetime
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.decomposition import PCA
 
 # 作为全局变量进行测试
-FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'TVMA20', 'EnterpriseFCFPS',
-              'PS', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'GrossProfit', 'FY12P',
+
+FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'PVI', 'EnterpriseFCFPS',
+              'PS', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'NIAP', 'FY12P',
               'AD', 'TotalAssetGrowRate', 'MA120']
-# , 'NetIntExpense', 'GrossProfit'
-# print("传入因子参数为", 'AdminExpenseTTM', 'FinanExpenseTTM')
 
 
 # 中位数去极值法
@@ -57,7 +58,7 @@ def filter_MAD(df, factor, n=3):
 
 
 def init(context):
-    context.random_forest = RandomForestRegressor(max_depth=2, n_estimators=50)
+
     # context.SVM = svm.SVC(gamma='scale')
     # 账号设置：设置初始资金为 10000000 元
     set_backtest(initial_cash=10000000, future_cost_fee=1.0, stock_cost_fee=30, margin_rate=1.0, slide_price=0.0,
@@ -66,7 +67,7 @@ def init(context):
     reg_kdata('day', 1)
     global FactorCode  # 全局单因子代号
     reg_factor(factor=FactorCode)
-    print("init 函数, 注册因子为{}".format(FactorCode[0]))
+
     context.FactorCode = FactorCode  #
 
     # 超参数设置：
@@ -75,7 +76,7 @@ def init(context):
 
     # 较敏感的超参数，需要调节
     context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 60   # 股票预测收益率的下分位数，低于则卖出
+    context.down_pos = 20   # 股票预测收益率的下分位数，低于则卖出
     context.cash_rate = 0.6  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓
@@ -185,12 +186,27 @@ def on_data(context):
 
     # 训练样本的标签，为浮点数的收益率
     Y = np.array(FactorData['benefit']).astype(float)
+    """
+    pca = PCA(n_components=8)
+    X = pca.fit_transform(X)
+    Xtest = pca.fit_transform(Xtest)
+    """
+    """
+    gbdt_reg = GradientBoostingRegressor(n_estimators=50, learning_rate=0.1,
+                                         max_depth=6, random_state=1, loss='ls')
+    # 模型训练：
+    gbdt_reg.fit(X, Y)
+
+    X = X[:, gbdt_reg.feature_importances_ > 0]
+    Xtest = Xtest[:, gbdt_reg.feature_importances_ > 0]  
+    """
+    random_forest = RandomForestRegressor(max_depth=5, n_estimators=50)
 
     # 模型训练：
-    context.random_forest.fit(X, Y)
+    random_forest.fit(X, Y)
 
-    # LR分类预测：
-    y = context.random_forest.predict(Xtest)
+    # 分类预测：
+    y = random_forest.predict(Xtest)
     # 交易设置：
     positions = context.account().positions['volume_long']  # 多头持仓数量
     valid_cash = context.account(account_idx=0).cash['valid_cash'][0]  # 可用资金
@@ -202,12 +218,11 @@ def on_data(context):
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
-        # if position == 0 and y[i] == True and valid_cash > 0:  # 若预测结果为true(收益率>0)，买入
-            # print('开仓')
-        if position == 0 and y[i] > high_return and valid_cash > 0:  # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
+        if position == 0 and y[i] > high_return and valid_cash > 0 and y[i] > 0:
+            # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
             # 开仓数量 + 1防止分母为0
             # print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
-            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100)
+            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i] * 21 + 20] + 1)) * 100)
 
             # 控制委托量，不要过大或过小,需要保证是100的倍数
             if Num < 1000:
@@ -219,14 +234,13 @@ def on_data(context):
                 continue
 
             print("开仓数量为：{}".format(Num))
-            order_id = order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,
-                         price=0)  # 指定委托量开仓
+            order_id = order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1,
+                                    order_type=2, price=0)  # 指定委托量开仓
             # 对订单号为order_id的委托单设置止损，止损距离10个整数点，触发时，委托的方式用市价委托
             # stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=10, order_type=2)
-        elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
-
-        #elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
-            # print("平仓")
+        # elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
+        elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
+            print("平仓")
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position), side=2, position_effect=2,
                          order_type=2, price=0)  # 指定委托量平仓
 

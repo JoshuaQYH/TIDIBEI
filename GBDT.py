@@ -25,12 +25,11 @@ from sklearn import svm
 import math
 from sklearn import preprocessing
 import datetime
-from sklearn.decomposition import PCA
-from sklearn import linear_model
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import GradientBoostingRegressor
-
 # 作为全局变量进行测试
+
+
 FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'PVI', 'EnterpriseFCFPS',
               'PS', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'NIAP', 'FY12P',
               'AD', 'TotalAssetGrowRate', 'MA120']
@@ -65,6 +64,7 @@ def init(context):
     reg_kdata('day', 1)
     global FactorCode  # 全局单因子代号
     reg_factor(factor=FactorCode)
+    print("init 函数, 注册因子为{}".format(FactorCode[0]))
     context.FactorCode = FactorCode  #
 
     # 超参数设置：
@@ -169,8 +169,6 @@ def on_data(context):
         FactorDataTest = filter_MAD(FactorDataTest, Factor, 5)  # 中位数去极值法
         FactorDataTest[Factor] = preprocessing.scale(FactorDataTest[Factor])  # 标准化
 
-    # print(FactorData.head(1))
-    # print(FactorDataTest.head(1))
 
     # 训练和预测特征构建：# 行（样本数）* 列（特征数）
     X = np.ones([FactorData.shape[0], len(Fcode)])
@@ -184,28 +182,15 @@ def on_data(context):
     # 训练样本的标签，为浮点数的收益率
     Y = (np.array(FactorData['benefit']).astype(float) > 0)
 
-    SVM = svm.SVR(gamma='scale')
-
-
-    gbr = GradientBoostingRegressor()
-    gbr.fit(X, Y)
-    enc = OneHotEncoder()
-    enc.fit(gbr.apply(X))
-
-    new_X = enc.transform(gbr.apply(X))
-    new_X = new_X.toarray()
-
-    X = new_X
-
-    new_Xtest = enc.transform(gbr.apply(Xtest))
-    new_Xtest = new_Xtest.toarray()
-    Xtest = new_Xtest
+    gbdt_reg = GradientBoostingRegressor(n_estimators=50, learning_rate=0.1,
+                             max_depth=8, random_state=1, loss='ls')
 
     # 模型训练：
-    SVM.fit(X, Y)
+    gbdt_reg.fit(X, Y)
 
     # LR分类预测：
-    y = SVM.predict(Xtest)
+    y = gbdt_reg.predict(Xtest)
+
     # 交易设置：
     positions = context.account().positions['volume_long']  # 多头持仓数量
     valid_cash = context.account(account_idx=0).cash['valid_cash'][0]  # 可用资金
@@ -217,9 +202,9 @@ def on_data(context):
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
-        #if position == 0 and y[i] == True and valid_cash > 0:  # 若预测结果为true(收益率>0)，买入
+        # if position == 0 and y[i] == True and valid_cash > 0:  # 若预测结果为true(收益率>0)，买入
             # print('开仓')
-        if position == 0 and y[i] > high_return and valid_cash > 0 and y[i] > 0:
+        if position == 0 and y[i] > high_return and valid_cash > 0 and y[i] > 0 :
             # 开仓数量 + 1防止分母为0
             # print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
             Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i] * 21 + 20] + 1)) * 100)
@@ -239,7 +224,7 @@ def on_data(context):
             # 对订单号为order_id的委托单设置止损，止损距离10个整数点，触发时，委托的方式用市价委托
             # stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=10, order_type=2)
         # elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
-        elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
+        elif position > 0 and y[i] < low_return :  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
             # print("平仓")
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position), side=2, position_effect=2,
                          order_type=2, price=0)  # 指定委托量平仓
@@ -247,13 +232,13 @@ def on_data(context):
 
 if __name__ == '__main__':
 
-    file_path = 'svm.py'
+    file_path = 'GBDT.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
     end_date = '2018-09-30'
 
-    strategy_name = 'svm'
+    strategy_name = 'GBDT'
 
     run_backtest(strategy_name=strategy_name, file_path=file_path,
                  target_list=list(get_code_list('hs300', date=begin_date)['code']),

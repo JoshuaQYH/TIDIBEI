@@ -7,34 +7,30 @@
     - 质量类：ROIC, CashToCurrentLiability
     - 特色技术指标：STDDEV
     - 收益风险：DDNCR
-    - 情绪类：TVMA20
+    - 情绪类：TVMA20/PVI
     - 每股指标类：EnterpriseFCFPS
     - 价值类：PS
-    - 基础类：AdminExpenseTTM, FinanExpenseTTM, NetIntExpense, GrossProfit
+    - 基础类：AdminExpenseTTM, FinanExpenseTTM, NetIntExpense, GrossProfit/NIAP
     - 行业分析师：FY12P
-    - 动量类：TotalAssetGrowRate
+    - 动量类：AD
     - 成长类：TotalAssetGrowRate
     - 常用技术类：MA120
 ... 其余逻辑参照single_factor_test.py
+
 ----------------------------------------------------------
 """
 from atrader import *
 import pandas as pd
 import numpy as np
-from sklearn import svm
+from sklearn.ensemble import RandomForestRegressor
 import math
 from sklearn import preprocessing
 import datetime
-from sklearn.decomposition import PCA
-from sklearn import linear_model
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.ensemble import GradientBoostingRegressor
 
 # 作为全局变量进行测试
 FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'PVI', 'EnterpriseFCFPS',
               'PS', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'NIAP', 'FY12P',
               'AD', 'TotalAssetGrowRate', 'MA120']
-
 
 # 中位数去极值法
 def filter_MAD(df, factor, n=3):
@@ -65,11 +61,8 @@ def init(context):
     reg_kdata('day', 1)
     global FactorCode  # 全局单因子代号
     reg_factor(factor=FactorCode)
-    context.FactorCode = FactorCode  #
 
-    # 超参数设置：
-    context.Len = 21    # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日，假设平均每个月 21 个交易日左右  250/12
-    context.Num = 0   # 记录当前交易日个数
+    context.FactorCode = FactorCode  #
 
     # 较敏感的超参数，需要调节
     context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
@@ -84,9 +77,6 @@ def init(context):
 
 
 def on_data(context):
-    context.Num = context.Num + 1
-    if context.Num < context.Len:  # 如果交易日个数小于Len+1，则进入下一个交易日进行回测
-        return
     if datetime.datetime.strftime(context.now, '%Y-%m-%d') not in context.month_begin:  # 调仓频率为月,月初开始调仓
         return
 
@@ -100,7 +90,6 @@ def on_data(context):
 
     # 数据存储变量：
     # Close 字段为标签，Fcode 为标签
-    FactorData = pd.DataFrame(columns=(['idx', 'benefit'] + Fcode))  # 存储训练特征及标签样本
     FactorDataTest = pd.DataFrame(columns=(['idx'] + Fcode))       # 存储预测特征样本
 
     # K线数据序号对齐
@@ -108,34 +97,10 @@ def on_data(context):
 
     # 按标的处理数据：
     for i in range(300):
-        # 训练特征集及训练标签构建：
-        # 临时数据存储变量:
-        FactorData0 = pd.DataFrame(np.full([1, len(Fcode) + 2], np.nan),
-            columns=(['idx', 'benefit'] + Fcode))
         # 存储预测特征样本
         FactorDataTest0 = pd.DataFrame(np.full([1, len(Fcode) + 1], np.nan), columns=(['idx'] + Fcode))
-
         # 因子数据 序号对齐, 提取当前标的的因子数据
         FData0 = FData[FData['target_idx'] == tempIdx[i]].reset_index(drop=True)
-
-        # 按特征处理数据：
-        for FC in context.FactorCode:
-            # 提取当前标的中与当前因子FC相同的部分
-            FCData = FData0[FData0['factor'] == FC]['value'].reset_index(drop=True)
-            FactorData0[FC] = FCData[0]  # 存储上一个月初的股票因子数据
-
-        # 按标签处理数据：
-        # 提取当前标的的前一个月的K线面板数据
-        close = np.array(KData[KData['target_idx'] == tempIdx[i]]['close'])
-        # 计算当前标的在上一个月的收益率
-        benefit = (close[context.Len - 1] - close[0]) / close[0]
-
-        FactorData0['benefit'] = benefit
-        # idx: 建立当前标的在训练样本集中的索引
-        FactorData0['idx'] = tempIdx[i]
-        # 合并数据：组成训练样本
-        FactorData = FactorData.append(FactorData0, ignore_index=True)
-
         # 预测特征集构建：建立标的索引
         FactorDataTest0['idx'] = tempIdx[i]
         # 按特征处理数据，过程同建立训练特征
@@ -157,55 +122,27 @@ def on_data(context):
     """
 
     # 数据清洗：
-    FactorData = FactorData.dropna(axis=0, how='any').reset_index(drop=True)  # 清洗数据
     FactorDataTest = FactorDataTest.dropna(axis=0, how='any').reset_index(drop=True)  # 清洗数据
     Idx = FactorDataTest['idx']  # 剩余标的序号
 
     # 按特征进行预处理
     for Factor in context.FactorCode:
-        FactorData = filter_MAD(FactorData, Factor, 5)  # 中位数去极值法
-        FactorData[Factor] = preprocessing.scale(FactorData[Factor])  # 标准化
-
         FactorDataTest = filter_MAD(FactorDataTest, Factor, 5)  # 中位数去极值法
         FactorDataTest[Factor] = preprocessing.scale(FactorDataTest[Factor])  # 标准化
 
     # print(FactorData.head(1))
     # print(FactorDataTest.head(1))
 
-    # 训练和预测特征构建：# 行（样本数）* 列（特征数）
-    X = np.ones([FactorData.shape[0], len(Fcode)])
+    # 预测特征构建：# 行（样本数）* 列（特征数）
     Xtest = np.ones([FactorDataTest.shape[0], len(Fcode)])
 
     # 循环填充特征到numpy数组中
-    for i in range(X.shape[1]):
-        X[:, i] = FactorData[Fcode[i]]
+    for i in range(Xtest.shape[1]):
         Xtest[:, i] = FactorDataTest[Fcode[i]]
 
-    # 训练样本的标签，为浮点数的收益率
-    Y = (np.array(FactorData['benefit']).astype(float) > 0)
 
-    SVM = svm.SVR(gamma='scale')
-
-
-    gbr = GradientBoostingRegressor()
-    gbr.fit(X, Y)
-    enc = OneHotEncoder()
-    enc.fit(gbr.apply(X))
-
-    new_X = enc.transform(gbr.apply(X))
-    new_X = new_X.toarray()
-
-    X = new_X
-
-    new_Xtest = enc.transform(gbr.apply(Xtest))
-    new_Xtest = new_Xtest.toarray()
-    Xtest = new_Xtest
-
-    # 模型训练：
-    SVM.fit(X, Y)
-
-    # LR分类预测：
-    y = SVM.predict(Xtest)
+    # 分类预测：
+    y = 0
     # 交易设置：
     positions = context.account().positions['volume_long']  # 多头持仓数量
     valid_cash = context.account(account_idx=0).cash['valid_cash'][0]  # 可用资金
@@ -217,9 +154,9 @@ def on_data(context):
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
-        #if position == 0 and y[i] == True and valid_cash > 0:  # 若预测结果为true(收益率>0)，买入
+        # if position == 0 and y[i] == True and valid_cash > 0:  # 若预测结果为true(收益率>0)，买入
             # print('开仓')
-        if position == 0 and y[i] > high_return and valid_cash > 0 and y[i] > 0:
+        if position == 0 and y[i] > high_return and valid_cash > 0:  # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
             # 开仓数量 + 1防止分母为0
             # print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
             Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i] * 21 + 20] + 1)) * 100)
@@ -238,8 +175,8 @@ def on_data(context):
                          price=0)  # 指定委托量开仓
             # 对订单号为order_id的委托单设置止损，止损距离10个整数点，触发时，委托的方式用市价委托
             # stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=10, order_type=2)
-        # elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
-        elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
+        elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
+        # elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
             # print("平仓")
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position), side=2, position_effect=2,
                          order_type=2, price=0)  # 指定委托量平仓
@@ -247,13 +184,13 @@ def on_data(context):
 
 if __name__ == '__main__':
 
-    file_path = 'svm.py'
+    file_path = 'random_forest_reg.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
     end_date = '2018-09-30'
 
-    strategy_name = 'svm'
+    strategy_name = 'random_forest_reg'
 
     run_backtest(strategy_name=strategy_name, file_path=file_path,
                  target_list=list(get_code_list('hs300', date=begin_date)['code']),

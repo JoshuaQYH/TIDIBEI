@@ -16,6 +16,12 @@
     - 常用技术类：MA120
 ... 其余逻辑参照single_factor_test.py
 ----------------------------------------------------------
+
+时间窗口滚动模型：
+在原来的基础上增加了滚动选项。
+原来的时间窗口固定为一个，即前20天为一个时间窗口。
+现在支持时间窗口向前滚动获取数据，有：时间窗口第一天的因子值，时间窗口内各股票的平均收益率；
+
 """
 from atrader import *
 import pandas as pd
@@ -25,6 +31,7 @@ import math
 from sklearn import preprocessing
 import datetime
 from xgboost.sklearn import XGBRegressor
+from sklearn.ensemble import RandomForestRegressor
 
 # 中位数去极值法
 def filter_MAD(df, factor, n=3):
@@ -49,34 +56,26 @@ def filter_MAD(df, factor, n=3):
 
 def init(context):
 
-    # 初始化模型
-    xgb_params = {'learning_rate': 0.01, 'n_estimators': 500, 'max_depth': 5, 'min_child_weight': 4, 'seed': 1000,
-                  'subsample': 0.8, 'colsample_bytree': 0.8, 'gamma': 0.1, 'reg_alpha': 0, 'reg_lambda': 1}
-
-    xgb_model = XGBRegressor(**xgb_params)
-    context.xgb = xgb_model
-
     # 账号设置：设置初始资金为 10000000 元
     set_backtest(initial_cash=10000000, future_cost_fee=1.0, stock_cost_fee=30, margin_rate=1.0, slide_price=0.0,
                  price_loc=1, deal_type=0, limit_type=0)
 
     # 注册数据：日频数据
     reg_kdata('day', 1)
-    FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'TVMA20', 'EnterpriseFCFPS',
-                  'PS', 'TA2EV', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'FY12P',
-                  'TotalAssetGrowRate', 'MA120']
+    FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'PVI', 'EnterpriseFCFPS',
+                  'PS', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'NIAP', 'FY12P',
+                  'AD', 'TotalAssetGrowRate', 'MA120']
     reg_factor(factor=FactorCode)
     context.FactorCode = FactorCode
 
     # 参数设置：
-    context.LEN = 45  # 时间窗口滑动最大范围
+    context.LEN = 21   # 时间窗口滑动最大范围
     context.N1 = 20    # 时间窗口中的训练/预测特征部分
-    context.N2 = 20    # 时间窗口中的训练标签部分
-    context.Num = 0    # 记录当前交易日个数， 保证交易日个数需要大于时间窗口滑动的最大范围
+    context.Num = 0    # 记录当前交易日个数，保证交易日个数需要大于时间窗口滑动的最大范围
 
     # 较敏感的超参数，需要调节
     context.upper_pos = 80   # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 30    # 股票预测收益率的下分位数，低于则卖出
+    context.down_pos = 60    # 股票预测收益率的下分位数，低于则卖出
     context.cash_rate = 0.6  # 计算可用资金比例的分子，
 
     # 确保月初调仓
@@ -115,25 +114,24 @@ def on_data(context):
     """
     FData = get_reg_factor(reg_idx=context.reg_factor[0], target_indices=[x for x in range(300)], length=context.LEN,
                            df=True)  # 获取因子数据
+
     # ------------------------------------- #
     #  特征构建                             #
     # ------------------------------------- #
     Fcode = list()
-    # 此处构建因子列名，同一个因子在N1天内，会有N1个取值。
-    for i in range(context.N1):
-        for FC in context.FactorCode:
-            Fcode.append(FC + '-' + str(i))
+    # 此处构建因子列名，取时间窗的第一天因子作为训练/预测数据样本
+    Fcode = context.FactorCode
 
     FactorData_list = []  # 存储多个时间窗口的训练样本和标签
     """
     用于训练的DataFrame，每一列的含义如下：
-    idx  | benefit |  factor1_1  | factor1_2 | .... | factorm_n
+    idx  | benefit |  factor1  | factor1 | .... | factorm
     idx 表示沪深300股中股票的序号，范围从 0~299，我们可以通过该序号定位股票
     benefit 表示该股票在某时间窗口后 N2 天内的平均收益率，即涨幅情况
-    factorm_n 表示第 m 个因子在第 n 天的值
+    factorm_n 表示在时间窗口内的第一天的第 m 个因子
     我们使用所有的factor作为训练特征，benefit作为训练标签。
     """
-    for i in range(context.LEN - context.N1 - context.N2 + 1):  # 时间窗口个数
+    for i in range(context.LEN - context.N1 + 1):  # 时间窗口个数
         FactorData = pd.DataFrame(columns=(['idx', 'benefit'] + Fcode))  # 存储训练特征及标签样本
         FactorData_list.append(FactorData)   # 将该时间窗的训练数据存入列表
 
@@ -152,7 +150,7 @@ def on_data(context):
     # ----------------------------------------- #
     #  按标的处理数据，提取训练特征和标签       #
     # ----------------------------------------- #
-    for window in range(context.LEN - context.N1 - context.N2 + 1):  # 滚动时间窗
+    for window in range(context.LEN - context.N1 + 1):  # 滚动时间窗
         for i in range(300):  # 按标的处理
             # 训练特征集及训练标签构建：
             FactorData0 = pd.DataFrame(np.full([1, len(Fcode) + 2], np.nan), columns=(['idx', 'benefit'] + Fcode))
@@ -164,8 +162,7 @@ def on_data(context):
             for FC in context.FactorCode:
                 # 提取当前标的中与当前因子FC相同的部分
                 FCData = FData0[FData0['factor'] == FC]['value'].reset_index(drop=True)
-                for k in range(context.N1):
-                    FactorData0[FC + '-' + str(k)] = FCData[window + k]
+                FactorData0[FC] = FCData[window]
 
             FactorData0['idx'] = i
 
@@ -174,13 +171,12 @@ def on_data(context):
             close = np.array(KData[KData['target_idx'] == tempIdx[i]]['close'])
 
             # 当前时间窗之后的N2天内的股票收益率情况
-            benefit = (close[window + context.N1 + context.N2 - 1] - close[window + context.N1]) / close[window + context.N1]
+            benefit = (close[window + context.N1 - 1] - close[window]) / close[window]
 
             FactorData0['benefit'] = benefit
             FactorData_list[window] = FactorData_list[window].append(FactorData0, ignore_index=True)
-            print("window: {}, stock: {}".format(window, i))
-        print("next window")
-
+            print("window:{}, stock :{} ".format(window, i))
+        print("pass this window: {}".format(window))
     # ----------------------------------- #
     # 提取预测样本特征                    #
     # ----------------------------------- #
@@ -197,8 +193,7 @@ def on_data(context):
         # 按特征处理数据，过程同建立训练特征
         for FC in context.FactorCode:
             FCData = FData0[FData0['factor'] == FC]['value'].reset_index(drop=True)
-            for k in range(context.N1):
-                FactorDataTest0[FC + '-' + str(k)] = FCData[context.LEN - context.N1 + k]
+            FactorDataTest0[FC] = FCData[context.LEN - 1]
 
         # 合并测试数据
         FactorDataTest = FactorDataTest.append(FactorDataTest0, ignore_index=True)
@@ -219,10 +214,18 @@ def on_data(context):
         FactorDataTest = filter_MAD(FactorDataTest, Factor, 5)  # 中位数去极值法
         FactorDataTest[Factor] = preprocessing.scale(FactorDataTest[Factor])  # 标准化
 
+    """
+    xgb_params = {'learning_rate': 0.01, 'n_estimators': 500, 'max_depth': 5, 'min_child_weight': 4, 'seed': 1000,
+                  'subsample': 0.8, 'colsample_bytree': 0.8, 'gamma': 0.1, 'reg_alpha': 0, 'reg_lambda': 1}
+
+    xgb_model = XGBRegressor(**xgb_params)    
+    """
+    RF = RandomForestRegressor(max_depth=5, n_estimators=50)
+
     # 训练和预测特征构建：# 行（样本数）* 列（特征数）
     for window in range(len(FactorData_list)):
         X = np.ones([FactorData_list[window].shape[0], len(Fcode)])
-        print(FactorData_list[window])
+
         # 循环填充特征到numpy数组中
         for i in range(X.shape[1]):
             X[:, i] = FactorData_list[window][Fcode[i]]
@@ -232,14 +235,14 @@ def on_data(context):
 
         # 模型训练：
         print("FITTING!")
-        context.xgb.fit(X, Y)
+        RF.fit(X, Y)
 
     Xtest = np.ones([FactorDataTest.shape[0], len(Fcode)])
     for i in range(X.shape[1]):
         Xtest[:, i] = FactorDataTest[Fcode[i]]
 
     # 分类预测：
-    y = context.xgb.predict(Xtest)
+    y = RF.predict(Xtest)
 
     # 交易设置：
     positions = context.account().positions['volume_long']  # 多头持仓数量
@@ -252,7 +255,7 @@ def on_data(context):
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
-        if position == 0 and y[i] > high_return and valid_cash > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
+        if position == 0 and y[i] > high_return and valid_cash > 0 and y[i] > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
             # 开仓数量 + 1防止分母为0
             Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100)
 
@@ -279,13 +282,13 @@ def on_data(context):
 
 if __name__ == '__main__':
 
-    file_path = 'xgboost_model.py'
+    file_path = 'time_roll_model.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
     end_date = '2018-09-30'
 
-    strategy_name = 'xgboost'
+    strategy_name = 'random_forest'
 
     run_backtest(strategy_name=strategy_name, file_path=file_path,
                  target_list=list(get_code_list('hs300', date=begin_date)['code']),
