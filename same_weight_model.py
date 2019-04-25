@@ -64,9 +64,13 @@ def init(context):
 
     context.FactorCode = FactorCode  #
 
+    # 超参数设置：
+    context.Len = 21  # 时间长度: 当交易日个数小于该事件长度时，跳过该交易日，假设平均每个月 21 个交易日左右  250/12
+    context.Num = 0  # 记录当前交易日个数
+
     # 较敏感的超参数，需要调节
-    context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 60   # 股票预测收益率的下分位数，低于则卖出
+    context.upper_pos = 85  # 股票预测收益率的上分位数，高于则买入
+    context.down_pos = 10   # 股票预测收益率的下分位数，低于则卖出
     context.cash_rate = 0.6  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓
@@ -77,6 +81,9 @@ def init(context):
 
 
 def on_data(context):
+    context.Num = context.Num + 1
+    if context.Num < context.Len:  # 如果交易日个数小于Len+1，则进入下一个交易日进行回测
+        return
     if datetime.datetime.strftime(context.now, '%Y-%m-%d') not in context.month_begin:  # 调仓频率为月,月初开始调仓
         return
 
@@ -140,9 +147,8 @@ def on_data(context):
     for i in range(Xtest.shape[1]):
         Xtest[:, i] = FactorDataTest[Fcode[i]]
 
+    y = np.average(Xtest, axis=1) / len(Fcode)  # 对每一行的因子序列取均值
 
-    # 分类预测：
-    y = 0
     # 交易设置：
     positions = context.account().positions['volume_long']  # 多头持仓数量
     valid_cash = context.account(account_idx=0).cash['valid_cash'][0]  # 可用资金
@@ -175,8 +181,8 @@ def on_data(context):
                          price=0)  # 指定委托量开仓
             # 对订单号为order_id的委托单设置止损，止损距离10个整数点，触发时，委托的方式用市价委托
             # stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=10, order_type=2)
-        elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
-        # elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
+        # elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
+        elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
             # print("平仓")
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position), side=2, position_effect=2,
                          order_type=2, price=0)  # 指定委托量平仓
@@ -184,13 +190,13 @@ def on_data(context):
 
 if __name__ == '__main__':
 
-    file_path = 'random_forest_reg.py'
+    file_path = 'same_weight_model.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
     end_date = '2018-09-30'
 
-    strategy_name = 'random_forest_reg'
+    strategy_name = 'same-weight-model'
 
     run_backtest(strategy_name=strategy_name, file_path=file_path,
                  target_list=list(get_code_list('hs300', date=begin_date)['code']),

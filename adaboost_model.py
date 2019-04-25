@@ -71,8 +71,8 @@ def init(context):
     context.Num = 0   # 记录当前交易日个数
 
     # 较敏感的超参数，需要调节
-    context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 60   # 股票预测收益率的下分位数，低于则卖出
+    context.upper_pos = 85  # 股票预测收益率的上分位数，高于则买入
+    context.down_pos = 10   # 股票预测收益率的下分位数，低于则卖出
     context.cash_rate = 0.6  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓

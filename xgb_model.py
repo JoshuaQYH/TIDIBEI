@@ -70,8 +70,8 @@ def init(context):
     context.Num = 0   # 记录当前交易日个数
 
     # 较敏感的超参数，需要调节
-    context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 60   # 股票预测收益率的下分位数，低于则卖出
+    context.upper_pos = 85  # 股票预测收益率的上分位数，高于则买入
+    context.down_pos = 10   # 股票预测收益率的下分位数，低于则卖出
     context.cash_rate = 0.6  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓
@@ -224,7 +224,7 @@ def on_data(context):
             # 对订单号为order_id的委托单设置止损，止损距离10个整数点，触发时，委托的方式用市价委托
             # stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=10, order_type=2)
         # elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
-        elif position > 0 and y[i] < low_return :  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
+        elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
             # print("平仓")
             order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position), side=2, position_effect=2,
                          order_type=2, price=0)  # 指定委托量平仓
