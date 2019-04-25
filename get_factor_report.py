@@ -8,7 +8,7 @@ import sys
 注意不要重复，可能会覆盖原来的文件！！！
 """
 
-csv_file = "strategy.csv"
+csv_file = "final_Q1_ChengZhang_ChangYongJiShuZhiBiao_DongLiang_factors.csv"
 strategy_dicts = at.get_strategy_id()
 save_dict = {"测试因子": [],
                  '年化收益率': [],
