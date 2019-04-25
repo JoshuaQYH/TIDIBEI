@@ -62,7 +62,7 @@ def init(context):
     reg_kdata('day', 1)
     global FactorCode  # 全局单因子代号
     reg_factor(factor=FactorCode)
-    print("init 函数, 注册因子为{}".format(FactorCode[0]))
+
     context.FactorCode = FactorCode  #
 
     # 超参数设置：
@@ -70,8 +70,8 @@ def init(context):
     context.Num = 0   # 记录当前交易日个数
 
     # 较敏感的超参数，需要调节
-    context.upper_pos = 85  # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 10   # 股票预测收益率的下分位数，低于则卖出
+    context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
+    context.down_pos = 20   # 股票预测收益率的下分位数，低于则卖出
     context.cash_rate = 0.6  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓
@@ -167,7 +167,6 @@ def on_data(context):
         FactorDataTest = filter_MAD(FactorDataTest, Factor, 5)  # 中位数去极值法
         FactorDataTest[Factor] = preprocessing.scale(FactorDataTest[Factor])  # 标准化
 
-
     # 训练和预测特征构建：# 行（样本数）* 列（特征数）
     X = np.ones([FactorData.shape[0], len(Fcode)])
     Xtest = np.ones([FactorDataTest.shape[0], len(Fcode)])
@@ -198,16 +197,16 @@ def on_data(context):
     P = context.cash_rate / (sum(y > 0) + 1)  # 设置每只标的可用资金比例 + 1 防止分母为0
 
     # 获取收益率的高分位数和低分位数
-    high_return, low_return = np.percentile(y, [context.down_pos, context.upper_pos])
+    low_return, high_return = np.percentile(y, [context.down_pos, context.upper_pos])
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
         # if position == 0 and y[i] == True and valid_cash > 0:  # 若预测结果为true(收益率>0)，买入
             # print('开仓')
-        if position == 0 and y[i] > high_return and valid_cash > 0 and y[i] > 0:
+        if position == 0 and y[i] > high_return and valid_cash > 0:
             # 开仓数量 + 1防止分母为0
             # print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
-            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i] * 21 + 20] + 1)) * 100)
+            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100)
 
             # 控制委托量，不要过大或过小,需要保证是100的倍数
             if Num < 1000:
@@ -225,9 +224,9 @@ def on_data(context):
             # stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=10, order_type=2)
         # elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
         elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
-            # print("平仓")
-            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position), side=2, position_effect=2,
-                         order_type=2, price=0)  # 指定委托量平仓
+            print("平仓，数量为: {}".format(position / 10 + 100))
+            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position / 10),
+                         side=2, position_effect=2, order_type=2, price=0)  # 指定委托量平仓
 
 
 if __name__ == '__main__':

@@ -75,7 +75,7 @@ def init(context):
 
     # 较敏感的超参数，需要调节
     context.upper_pos = 80   # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 60    # 股票预测收益率的下分位数，低于则卖出
+    context.down_pos = 20    # 股票预测收益率的下分位数，低于则卖出
     context.cash_rate = 0.6  # 计算可用资金比例的分子，
 
     # 确保月初调仓
@@ -251,11 +251,11 @@ def on_data(context):
     P = context.cash_rate / (sum(y > 0) + 1)  # 设置每只标的可用资金比例 + 1 防止分母为0
 
     # 获取收益率的高分位数和低分位数
-    high_return, low_return = np.percentile(y, [context.down_pos, context.upper_pos])
+    low_return, high_return = np.percentile(y, [context.down_pos, context.upper_pos])
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
-        if position == 0 and y[i] > high_return and valid_cash > 0 and y[i] > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
+        if position == 0 and y[i] > high_return and valid_cash > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
             # 开仓数量 + 1防止分母为0
             Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100)
 
@@ -275,9 +275,9 @@ def on_data(context):
             stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=10, order_type=2)
         # elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
         elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
-            # print("平仓")
-            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position), side=2, position_effect=2,
-                         order_type=2, price=0)  # 指定委托量平仓
+            print("平仓，数量为: {}".format(position / 10))
+            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position / 10),
+                         side=2, position_effect=2, order_type=2, price=0)  # 指定委托量平仓
 
 
 if __name__ == '__main__':
