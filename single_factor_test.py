@@ -78,7 +78,7 @@ def init(context):
 
     # 较敏感的超参数，需要调节
     context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 60   # 股票预测收益率的下分位数，低于则卖出
+    context.down_pos = 20   # 股票预测收益率的下分位数，低于则卖出
     context.cash_rate = 0.6  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓
@@ -87,6 +87,7 @@ def init(context):
     month_begin = days[pd.Series(months) != pd.Series(months).shift(1)]
     context.month_begin = pd.Series(month_begin).dt.strftime('%Y-%m-%d').tolist()
 
+    
 
 def on_data(context):
     context.Num = context.Num + 1
@@ -205,7 +206,7 @@ def on_data(context):
     P = context.cash_rate / (sum(y > 0) + 1)  # 设置每只标的可用资金比例 + 1 防止分母为0
 
     # 获取收益率的高分位数和低分位数
-    high_return, low_return = np.percentile(y, [context.down_pos, context.upper_pos])
+    low_return, high_return = np.percentile(y, [context.down_pos, context.upper_pos])
 
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]

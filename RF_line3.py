@@ -16,23 +16,21 @@
     - 成长类：TotalAssetGrowRate
     - 常用技术类：MA120
 ... 其余逻辑参照single_factor_test.py
+
 ----------------------------------------------------------
 """
 from atrader import *
 import pandas as pd
 import numpy as np
-from sklearn import svm
+from sklearn.ensemble import RandomForestRegressor
 import math
 from sklearn import preprocessing
 import datetime
-from sklearn.neural_network import MLPRegressor
 
 # 作为全局变量进行测试
-
-FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'TVMA20', 'EnterpriseFCFPS',
-              'PS', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'GrossProfit', 'FY12P',
+FactorCode = ['ROIC', 'CashToCurrentLiability', 'STDDEV', 'DDNCR', 'PVI', 'EnterpriseFCFPS',
+              'PS', 'AdminExpenseTTM', 'FinanExpenseTTM', 'NetIntExpense', 'NIAP', 'FY12P',
               'AD', 'TotalAssetGrowRate', 'MA120']
-
 
 # 中位数去极值法
 def filter_MAD(df, factor, n=3):
@@ -56,6 +54,8 @@ def filter_MAD(df, factor, n=3):
 
 
 def init(context):
+
+    # context.SVM = svm.SVC(gamma='scale')
     # 账号设置：设置初始资金为 10000000 元
     set_backtest(initial_cash=10000000, future_cost_fee=1.0, stock_cost_fee=30, margin_rate=1.0, slide_price=0.0,
                  price_loc=1, deal_type=0, limit_type=0)
@@ -63,6 +63,7 @@ def init(context):
     reg_kdata('day', 1)
     global FactorCode  # 全局单因子代号
     reg_factor(factor=FactorCode)
+
     context.FactorCode = FactorCode  #
 
     # 超参数设置：
@@ -70,8 +71,8 @@ def init(context):
     context.Num = 0   # 记录当前交易日个数
 
     # 较敏感的超参数，需要调节
-    context.upper_pos = 85  # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 20   # 股票预测收益率的下分位数，低于则卖出
+    context.upper_pos = 75  # 股票预测收益率的上分位数，高于则买入
+    context.down_pos = 10   # 股票预测收益率的下分位数，低于则卖出
     context.cash_rate = 0.6  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓
@@ -80,10 +81,17 @@ def init(context):
     month_begin = days[pd.Series(months) != pd.Series(months).shift(1)]
     context.month_begin = pd.Series(month_begin).dt.strftime('%Y-%m-%d').tolist()
 
+    # 三均线择时策略
+    # 无持仓的情况下，5日和20日均线都大于60日均线，买入，等价于5日和20日均线上穿60日均线，买入；
+    # 有持仓的情况下，5日和20日均线都小于60日均线，卖出，等价于5日和20日均线上穿60日均线，买入；
+    context.win = 61  # 计算所需总数据长度
+    context.win5 = 5  # 5日均线参数
+    context.win20 = 20  # 20日均线参数
+    context.win60 = 60  # 60日均线参数
 
 def on_data(context):
     context.Num = context.Num + 1
-    if context.Num < context.Len:  # 如果交易日个数小于Len+1，则进入下一个交易日进行回测
+    if context.Num < context.win:  # 如果交易日个数小于win，则进入下一个交易日进行回测
         return
     if datetime.datetime.strftime(context.now, '%Y-%m-%d') not in context.month_begin:  # 调仓频率为月,月初开始调仓
         return
@@ -177,17 +185,15 @@ def on_data(context):
         Xtest[:, i] = FactorDataTest[Fcode[i]]
 
     # 训练样本的标签，为浮点数的收益率
-    Y = (np.array(FactorData['benefit']).astype(float) > 0)
+    Y = np.array(FactorData['benefit']).astype(float)
 
-    mlp = MLPRegressor(hidden_layer_sizes=4, activation='logistic', solver='adam',
-                        max_iter=50)
+    random_forest = RandomForestRegressor(max_depth=5, n_estimators=50)
 
     # 模型训练：
-    mlp.fit(X, Y)
+    random_forest.fit(X, Y)
 
     # LR分类预测：
-    y = mlp.predict(Xtest)
-
+    y = random_forest.predict(Xtest)
     # 交易设置：
     positions = context.account().positions['volume_long']  # 多头持仓数量
     valid_cash = context.account(account_idx=0).cash['valid_cash'][0]  # 可用资金
@@ -195,17 +201,38 @@ def on_data(context):
     P = context.cash_rate / (sum(y > 0) + 1)  # 设置每只标的可用资金比例 + 1 防止分母为0
 
     # 获取收益率的高分位数和低分位数
-    low_return,high_return = np.percentile(y, [context.down_pos, context.upper_pos])
+    low_return, high_return = np.percentile(y, [context.down_pos, context.upper_pos])
 
+    # 进行择时准备
+    # 获取前61天的数据
+    data = get_reg_kdata(reg_idx=context.reg_kdata[0], length=context.win, fill_up=True,
+                         df=True)  # data值为数据帧DataFrame类型，存储所有标的的K线行情数据。
+    # 获取收盘价数据
+    close = data.close.values.reshape(-1, context.win).astype(float)  # 从data行情数据中获取收盘价，并转为ndarray数据类型
+    # 计算均线值：
+    ma5 = close[:, -context.win5:].mean(axis=1)    # 5日均线
+    ma20 = close[:, -context.win20:].mean(axis=1)  # 20日均线
+    ma60 = close[:, -context.win60:].mean(axis=1)  # 60日均线
+
+    # 获取标的序号：从0~299
+    target = np.array(range(300))
+    positions_val = context.account().positions['volume_long'].values  # 多头持仓数量
+    # 计算买入信号：
+    buy_signal = np.logical_and(positions_val == 0, ma5 > ma60,
+                                ma20 > ma60)  # 无持仓的情况下，5日和20日均线都大于60日均线，买入，等价于5日和20日均线上穿60日均线，买入；
+    # 计算卖出信号：
+    sell_signal = np.logical_and(positions_val > 0, ma5 < ma60,
+                                 ma20 < ma60)  # 有持仓的情况下，5日和20日均线都小于60日均线，卖出，等价于5日和20日均线上穿60日均线，买入；
+    # 获取买入信号标的的序号
+    target_buy = target[buy_signal].tolist()  # 一个布尔数组，记录了标的是否要买
+    # 获取卖出信号标的的序号
+    target_sell = target[sell_signal].tolist() # 同上
     for i in range(len(Idx)):
         position = positions.iloc[Idx[i]]
-        # if position == 0 and y[i] == True and valid_cash > 0:  # 若预测结果为true(收益率>0)，买入
-            # print('开仓')
-        if position == 0 and y[i] > high_return and valid_cash > 0: # 当前无仓，且该股票收益大于高70%分位数，则开仓，买入
-            # 开仓数量 + 1防止分母为0
-            # print(valid_cash, P, KData['close'][Idx[i]])  # 这里的数目可考虑减少一点，，有时太多有时太少
-            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100)
 
+        # 当前无仓，且该股票收益大于高80%分位数，且5日和20日均线都大于或等于60日均线 则开仓，买入
+        if position == 0 and y[i] > high_return and valid_cash > 0 and Idx[i] in target_buy:
+            Num = int(math.floor(valid_cash * P / 100 / (KData['close'][Idx[i]] + 1)) * 100)
             # 控制委托量，不要过大或过小,需要保证是100的倍数
             if Num < 1000:
                 Num *= 10
@@ -214,28 +241,25 @@ def on_data(context):
                 Num -= Num % 100
             if Num <= 0:  # 不开仓
                 continue
-
             print("开仓数量为：{}".format(Num))
-            order_id = order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,
+            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,
                          price=0)  # 指定委托量开仓
-            # 对订单号为order_id的委托单设置止损，止损距离10个整数点，触发时，委托的方式用市价委托
-            # stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=10, order_type=2)
-        # elif position > 0 and y[i] == False: #预测结果为false(收益率<0)，卖出
-        elif position > 0 and y[i] < low_return:  # 当前持仓，且该股票收益小于低30%分位数，则平仓，卖出
+
+        # 当前持仓，且该股票收益小于低20%分位数，5日和20日均线都小于60日均线 则平仓，卖出
+        elif position > 0 and y[i] < low_return and Idx[i] in target_sell:
             print("平仓，数量为: {}".format(position / 10))
-            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position / 10),
+            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position),
                          side=2, position_effect=2, order_type=2, price=0)  # 指定委托量平仓
 
 
 if __name__ == '__main__':
-
-    file_path = 'MLP.py'
+    file_path = 'RF_line3.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
     end_date = '2018-09-30'
 
-    strategy_name = 'MLP'
+    strategy_name = 'RF_line3'
 
     run_backtest(strategy_name=strategy_name, file_path=file_path,
                  target_list=list(get_code_list('hs300', date=begin_date)['code']),

@@ -237,5 +237,5 @@ if __name__ == '__main__':
     strategy_name = 'random_forest_reg'
 
     run_backtest(strategy_name=strategy_name, file_path=file_path,
-                 target_list=list(get_code_list('hs300', date=begin_date)['code']),
+                 target_list=list(get_code_list('zz500', date=begin_date)['code']),
                  frequency='day', fre_num=1, begin_date=begin_date, end_date=end_date, fq=1)
