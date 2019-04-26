@@ -224,7 +224,7 @@ def on_data(context):
     sell_signal = np.logical_and(positions_val > 0, ma5 < ma60,
                                  ma20 < ma60)  # 有持仓的情况下，5日和20日均线都小于60日均线，卖出，等价于5日和20日均线上穿60日均线，买入；
     # 获取买入信号标的的序号
-    target_buy = target[buy_signal].tolist()  # 一个布尔数组，记录了标的是否要买
+    target_buy = target[buy_signal].tolist()  # 一个记录了标的是否要买
     # 获取卖出信号标的的序号
     target_sell = target[sell_signal].tolist() # 同上
     for i in range(len(Idx)):
