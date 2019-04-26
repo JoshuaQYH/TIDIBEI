@@ -89,6 +89,7 @@ def init(context):
     context.win20 = 20  # 20日均线参数
     context.win60 = 60  # 60日均线参数
 
+
 def on_data(context):
     context.Num = context.Num + 1
     if context.Num < context.win:  # 如果交易日个数小于win，则进入下一个交易日进行回测
@@ -187,7 +188,7 @@ def on_data(context):
     # 训练样本的标签，为浮点数的收益率
     Y = np.array(FactorData['benefit']).astype(float)
 
-    random_forest = RandomForestRegressor(max_depth=5, n_estimators=50)
+    random_forest = RandomForestRegressor(max_depth=6, n_estimators=50)
 
     # 模型训练：
     random_forest.fit(X, Y)
@@ -242,26 +243,24 @@ def on_data(context):
             if Num <= 0:  # 不开仓
                 continue
             print("开仓数量为：{}".format(Num))
-            order_id = order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,
+            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=Num, side=1, position_effect=1, order_type=2,
                          price=0)  # 指定委托量开仓
-            # 对订单号为order_id的委托单设置止损，止损距离10个整数点，触发时，委托的方式用市价委托
-            stop_loss_by_order(target_order_id=order_id, stop_type=1, stop_gap=15, order_type=2)
 
         # 当前持仓，且该股票收益小于低20%分位数，5日和20日均线都小于60日均线 则平仓，卖出
         elif position > 0 and y[i] < low_return and Idx[i] in target_sell:
-            print("平仓，数量为: {}".format(position))
-            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position),
+            print("平仓，数量为: {}".format(position/2))
+            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position/2),
                          side=2, position_effect=2, order_type=2, price=0)  # 指定委托量平仓
 
 
 if __name__ == '__main__':
-    file_path = 'RF_line3.py'
+    file_path = 'RF_line3-1.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
     end_date = '2018-09-30'
 
-    strategy_name = 'RF_line3'
+    strategy_name = 'RF_line3-1'
 
     run_backtest(strategy_name=strategy_name, file_path=file_path,
                  target_list=list(get_code_list('hs300', date=begin_date)['code']),

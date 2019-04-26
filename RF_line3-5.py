@@ -71,9 +71,9 @@ def init(context):
     context.Num = 0   # 记录当前交易日个数
 
     # 较敏感的超参数，需要调节
-    context.upper_pos = 80  # 股票预测收益率的上分位数，高于则买入
-    context.down_pos = 40   # 股票预测收益率的下分位数，低于则卖出
-    context.cash_rate = 0.6  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
+    context.upper_pos = 70  # 股票预测收益率的上分位数，高于则买入
+    context.down_pos = 30   # 股票预测收益率的下分位数，低于则卖出
+    context.cash_rate = 0.7  # 计算可用资金比例的分子，利益大于0的股票越多，比例越小
 
     # 确保月初调仓
     days = get_trading_days('SSE', '2016-01-01', '2018-09-30')
@@ -88,6 +88,7 @@ def init(context):
     context.win5 = 5  # 5日均线参数
     context.win20 = 20  # 20日均线参数
     context.win60 = 60  # 60日均线参数
+
 
 def on_data(context):
     context.Num = context.Num + 1
@@ -187,7 +188,7 @@ def on_data(context):
     # 训练样本的标签，为浮点数的收益率
     Y = np.array(FactorData['benefit']).astype(float)
 
-    random_forest = RandomForestRegressor(max_depth=5, n_estimators=50)
+    random_forest = RandomForestRegressor(max_depth=6, n_estimators=50)
 
     # 模型训练：
     random_forest.fit(X, Y)
@@ -249,19 +250,19 @@ def on_data(context):
 
         # 当前持仓，且该股票收益小于低20%分位数，5日和20日均线都小于60日均线 则平仓，卖出
         elif position > 0 and y[i] < low_return and Idx[i] in target_sell:
-            print("平仓，数量为: {}".format(position))
-            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position),
+            print("平仓，数量为: {}".format(position/2))
+            order_volume(account_idx=0, target_idx=int(Idx[i]), volume=int(position/2),
                          side=2, position_effect=2, order_type=2, price=0)  # 指定委托量平仓
 
 
 if __name__ == '__main__':
-    file_path = 'RF_line3.py'
+    file_path = 'RF_line3-5.py'
     block = 'hs300'
 
     begin_date = '2016-01-01'
     end_date = '2018-09-30'
 
-    strategy_name = 'RF_line3'
+    strategy_name = 'RF_line3-5'
 
     run_backtest(strategy_name=strategy_name, file_path=file_path,
                  target_list=list(get_code_list('hs300', date=begin_date)['code']),
