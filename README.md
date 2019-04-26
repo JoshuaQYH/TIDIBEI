@@ -2,7 +2,8 @@
 泰迪杯数据挖掘比赛协作仓库。——基于机器学习方法构建多因子选股模型。
 > Group Members：XiaoRu Chen，Xiaoling Ling，Yihao Qiu
 
-## TODO
+## 成果
+最优的随机森林模型：累计收益60%左右，经择时策略风险控制后，最大回撤率控制在9%左右，夏普率为0.9左右。
 
 ### 单因子测试
 
@@ -17,21 +18,19 @@
 ### 选用机器学习模型回测
 - 特征和标签构建。
 - 等权重线性模型。
-- 建立baseline models，尝试使用多种模型。SVR，RNN(LSTM)，xgboost, random_forest...
+- 建立baseline models，尝试使用多种模型。SVR，RNN(LSTM)，xgboost, random_forest，adaboost...
 - 交易逻辑确定。
 - 回测结果记录，分析。
 
-> _**官方提示：**_ random forest, SVM, Adaboost, etc.
-> 
+
 #### 关于模型的一些设想
 - 可参考论文[GBDT提取特征 + SVM二分类的方法](https://github.com/JoshuaQYH/TIDIBEI/blob/master/references/SA20190100000_36930159.pdf)
 - [LSTM进行选股](https://qiniu-images.datayes.com/huatai9.pdf)（在月频数据较少，可能效果不好）
 - [Adaboost](http://pg.jrj.com.cn/acc/Res/CN_RES/INVEST/2016/5/31/ed36ae43-0f6e-4051-bb9c-2e9a67632d74.pdf), randomforest, svm([启发式](http://or.nsfc.gov.cn/bitstream/00001903-5/353458/1/1000008947591.pdf)），[xgboost](https://cloud.tencent.com/developer/article/1137060)等等进行集成。如[Stacking](https://cloud.tencent.com/developer/article/1137060),bagging. 
 
 ### 风险控制
-- 风险模型
-- 择时模型
-
+- 风险模型：barra模型
+- 择时模型：最后敲定三均线择时策略。
 
 ## 文件说明
 - `data_exploration.ipynb`: atrader API调用测试文件。
@@ -40,6 +39,7 @@
 - `find_factor.py`: 自实现的因子绩效分析文件(**已弃用**)
 - `run_test.bat`: 脚本自动化运行python程序，实现多次执行策略。
 - 'factor_analysis': 类内因子共线性分析文件，绘制相关系数矩阵。
+- 以模型名标识模型回测文件。
 
 ## LINK 
 - [AutoTrader 官方API文档](https://www.digquant.com.cn/documents/17#h1-u5FEBu901Fu5F00u59CB-0)
