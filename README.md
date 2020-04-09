@@ -1,3 +1,11 @@
+<!--
+ * @Author: your name
+ * @Date: 2020-04-10 00:48:27
+ * @LastEditTime: 2020-04-10 00:49:57
+ * @LastEditors: Please set LastEditors
+ * @Description: In User Settings Edit
+ * @FilePath: \TIDIBEI\README.md
+ -->
 # Tidy-QuantTrading
 泰迪杯数据挖掘比赛协作仓库。——基于机器学习方法构建多因子选股模型。
 > Group Members：XiaoRu Chen，Xiaoling Ling，Yihao Qiu
@@ -16,6 +24,7 @@
 > _**官方提示：**_ 单因子问题，可以手动实现一下，或者可以弱化一下，通过间接的方法去实现这个问题，并不一定要实现一个完整的回测框架才能解决单因子分析的问题
 
 ### 选用机器学习模型回测
+
 - 特征和标签构建。
 - 等权重线性模型。
 - 建立baseline models，尝试使用多种模型。SVR，RNN(LSTM)，xgboost, random_forest，adaboost...
@@ -30,7 +39,7 @@
 
 ### 风险控制
 - 风险模型：barra模型
-- 择时模型：最后敲定三均线择时策略。
+- 择时模型：三均线择时策略。
 
 ## 文件说明
 - `data_exploration.ipynb`: atrader API调用测试文件。
